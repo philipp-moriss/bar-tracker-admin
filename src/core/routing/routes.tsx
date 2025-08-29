@@ -1,4 +1,5 @@
-import { LoginPage } from "@/pages/customer/login";
+import { LoginPage } from "@/pages/login";
+import { RegisterPage } from "@/pages/register";
 import { createBrowserRouter } from "react-router-dom";
 
 export const router = createBrowserRouter([
@@ -8,7 +9,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "login",
-    element: <LoginPage />,
+    element: <LoginPage/>,
   },
   {
     path: "admin",
@@ -19,7 +20,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "register",
-        element: <LoginPage />,
+        element: <RegisterPage />,
       },
     ],
   },

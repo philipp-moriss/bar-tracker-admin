@@ -189,7 +189,7 @@ export const LoginPage = () => {
                   {isLoading ? (
                     <div className="flex items-center justify-center">
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      Вход...
+                      {t("common.loading")}
                     </div>
                   ) : (
                     t("common.submit")
