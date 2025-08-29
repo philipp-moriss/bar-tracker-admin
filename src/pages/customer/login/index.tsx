@@ -93,18 +93,18 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex flex-col items-center bg-gradient-to-br from-barTrekker-lightGrey to-white p-4">
       <div className="w-full flex justify-end">
         <LanguageSwitcher />
       </div>
       <div className="w-full max-w-md flex-1 flex items-center justify-center">
-        <Card className="shadow-xl border-0">
+        <Card className="shadow-xl border-0 bg-white">
           <CardHeader className="text-center pb-6">
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              {t("admin.login.title")}
+            <CardTitle className="text-2xl font-bold text-barTrekker-darkGrey">
+              {t("auth.login.title")}
             </CardTitle>
-            <p className="text-gray-600 mt-2">
-              Войдите в свою учетную запись администратора
+            <p className="text-barTrekker-darkGrey/70 mt-2">
+              {t("auth.login.description")}
             </p>
           </CardHeader>
 
@@ -119,17 +119,17 @@ export const LoginPage = () => {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">
-                        Email
+                      <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                        {t("common.email")}
                       </FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                          <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-5 w-5" />
                           <Input
                             {...field}
                             type="email"
-                            placeholder={t("auth.login.email.placeholder")}
-                            className="pl-12"
+                            placeholder={t("common.email")}
+                            className="pl-12 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                             autoComplete="email"
                           />
                         </div>
@@ -144,23 +144,23 @@ export const LoginPage = () => {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium text-gray-700">
-                        Пароль
+                      <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                        {t("common.password")}
                       </FormLabel>
                       <FormControl>
                         <div className="relative">
-                          <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                          <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-5 w-5" />
                           <Input
                             {...field}
                             type={showPassword ? "text" : "password"}
-                            placeholder={t("auth.login.password.placeholder")}
-                            className="pl-12 pr-12"
+                            placeholder={t("common.password")}
+                            className="pl-12 pr-12 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                             autoComplete="current-password"
                           />
                           <button
                             type="button"
                             onClick={togglePasswordVisibility}
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                            className="absolute right-4 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 hover:text-barTrekker-orange transition-colors"
                           >
                             {showPassword ? (
                               <EyeOff className="h-5 w-5" />
@@ -183,7 +183,7 @@ export const LoginPage = () => {
 
                 <Button
                   type="submit"
-                  className="w-full h-12 text-base font-medium"
+                  className="w-full h-12 text-base font-medium bg-barTrekker-orange hover:bg-barTrekker-orange/90 text-white"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -192,18 +192,18 @@ export const LoginPage = () => {
                       Вход...
                     </div>
                   ) : (
-                    t("auth.login.button")
+                    t("common.submit")
                   )}
                 </Button>
               </form>
             </Form>
 
             <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-barTrekker-darkGrey/70">
                 {t("auth.login.noAccount")}{" "}
                 <a
                   href="/register"
-                  className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  className="text-barTrekker-orange hover:text-barTrekker-orange/80 font-medium transition-colors"
                 >
                   {t("auth.login.registerLink")}
                 </a>

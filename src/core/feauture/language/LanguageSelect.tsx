@@ -3,9 +3,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const languages = [
     { value: 'en', label: 'EN' },
-    { value: 'he', label: 'עברית' },
-    { value: 'ru', label: 'RU' },
-    { value: 'ar', label: 'العربية' }
 ]
 
 interface LanguageSelectProps {

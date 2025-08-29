@@ -9,9 +9,6 @@ export const LanguageSwitcher = () => {
 
   const languages = [
     { code: 'en', name: 'EN', dir: 'ltr' },
-    { code: 'he', name: 'עברית', dir: 'rtl' },
-    { code: 'ru', name: 'RU', dir: 'ltr' },
-    { code: 'ar', name: 'العربية', dir: 'rtl' }
   ];
 
   return (

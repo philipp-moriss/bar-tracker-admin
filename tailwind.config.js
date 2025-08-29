@@ -21,8 +21,8 @@ module.exports = {
   				foreground: 'hsl(var(--popover-foreground))'
   			},
   			primary: {
-				DEFAULT: '#313A56',
-				foreground: '#FFFFFF'
+				DEFAULT: 'hsl(var(--primary))',
+				foreground: 'hsl(var(--primary-foreground))'
   			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
@@ -53,6 +53,14 @@ module.exports = {
   			table: {
   				hover: '#F7F8FF',
   				selected: '#DBDEFF'
+  			},
+  			// BAR TREKKER цветовая палитра
+  			barTrekker: {
+  				darkGrey: '#3C3D45',
+  				lightGrey: '#E8E8E8',
+  				orange: '#F78C3F',
+  				white: '#FFFFFF',
+  				lightBlue: '#4F90F7'
   			}
   		},
   		keyframes: {
