@@ -1,3 +1,4 @@
+import { HomePage } from "@/pages/home";
 import { LoginPage } from "@/pages/login";
 import { RegisterPage } from "@/pages/register";
 import { createBrowserRouter } from "react-router-dom";
@@ -5,7 +6,7 @@ import { createBrowserRouter } from "react-router-dom";
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <div>Hello</div>,
+    element: <HomePage/>,
   },
   {
     path: "login",

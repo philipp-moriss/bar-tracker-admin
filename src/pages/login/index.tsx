@@ -21,7 +21,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/core/components/ui/form";
-import { useAuthStore } from "@/core/stores/authStore";
 import { AdminLoginDto } from "@/core/types/auth";
 import { LanguageSwitcher } from "@/core/feauture/language/LanguageSwitcher";
 
@@ -40,7 +39,6 @@ export const LoginPage = () => {
   const { t } = useTranslation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser } = useAuthStore();
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -73,7 +71,7 @@ export const LoginPage = () => {
         userId: 1,
       };
 
-      setUser(mockResponse);
+      console.log(mockResponse, "mockResponse");
 
       // Перенаправление на главную страницу
       window.location.href = "/admin";

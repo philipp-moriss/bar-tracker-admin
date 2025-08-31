@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/core/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/core/components/ui/popover'
-import { useAuthStore } from '@/core/stores/authStore'
 import { ROUTES } from '@/core/constants/routes'
 import { Menu, X, User, LogOut } from 'lucide-react'
 import { LanguageSelect } from '@/core/feauture/language/LanguageSelect'
@@ -12,11 +11,10 @@ export const AdminHeader = () => {
     const { t } = useTranslation()
     const navigate = useNavigate()
     const location = useLocation()
-    const { clearUser, user } = useAuthStore()
     const [isMenuOpen, setIsMenuOpen] = useState(false)
 
     const handleLogout = () => {
-        clearUser()
+        // clearUser()
         navigate('/customer/login')
     }
 
@@ -57,7 +55,8 @@ export const AdminHeader = () => {
                                         <User className="h-4 w-4 text-gray-600" />
                                     </div>
                                     <span className="text-sm font-medium text-gray-700">
-                                        {user?.email ? user.email.split('@')[0] : 'User_name'}
+                                        {/* {user?.email ? user.email.split('@')[0] : 'User_name'} */}
+                                        User_name
                                     </span>
                                 </Button>
                             </PopoverTrigger>
@@ -209,5 +208,5 @@ export const AdminHeader = () => {
                 </div>
             )}
         </header>
-    )
+  );
 }

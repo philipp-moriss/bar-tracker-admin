@@ -22,7 +22,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/core/components/ui/form";
-import { useAuthStore } from "@/core/stores/authStore";
 import { LanguageSwitcher } from "@/core/feauture/language/LanguageSwitcher";
 
 // Схема валидации для формы регистрации
@@ -68,7 +67,6 @@ export const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser } = useAuthStore();
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -111,7 +109,7 @@ export const RegisterPage = () => {
         lastName: data.lastName,
       };
 
-      setUser(mockResponse);
+      console.log(mockResponse, "mockResponse");
 
       // Перенаправление на главную страницу
       window.location.href = "/admin";
