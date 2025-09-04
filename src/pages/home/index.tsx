@@ -5,13 +5,13 @@ import {
     CardTitle,
 } from "@/core/components/ui/card";
 import { EventsService } from "@/modules/events/events.service";
-import { fierbaseApp } from "@/modules/firebase/config";
+import { firebaseApp } from "@/modules/firebase/config";
 import { getAuth } from "firebase/auth";
 
 export const HomePage = () => {
   const eventsService = new EventsService();
 
-  const otherAuth = getAuth(fierbaseApp);
+  const otherAuth = getAuth(firebaseApp);
   otherAuth.onAuthStateChanged((user) => {
     console.log(user, "user");
     if (user) {

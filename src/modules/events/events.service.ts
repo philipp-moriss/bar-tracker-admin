@@ -7,14 +7,14 @@ import {
   getFirestore,
   addDoc,
 } from "firebase/firestore/lite";
-import { fierbaseApp } from "../firebase/config";
+import { firebaseApp } from "../firebase/config";
 import { BaseFirebaseEntityClass } from "../interface";
 
 export class EventsService implements BaseFirebaseEntityClass<Event> {
   private readonly db: Firestore;
   private readonly eventsCollection: CollectionReference<DocumentData>;
   constructor() {
-    this.db = getFirestore(fierbaseApp);
+    this.db = getFirestore(firebaseApp);
     this.eventsCollection = collection(this.db, "events");
   }
 

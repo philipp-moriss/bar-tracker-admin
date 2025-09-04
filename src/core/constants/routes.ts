@@ -1,7 +1,22 @@
 export const ROUTES = {
     ADMIN: {
         LOGIN: '/admin/login',
-        REGISTER: '/admin/register',
+        SETUP: '/admin/setup',
+        DASHBOARD: '/admin',
+        EVENTS: {
+            LIST: '/admin/events',
+            CREATE: '/admin/events/create',
+            DETAILS: (id: string) => `/admin/events/${id}`,
+            EDIT: (id: string) => `/admin/events/${id}/edit`,
+        },
+        TICKETS: {
+            LIST: '/admin/tickets',
+            DETAILS: (id: string) => `/admin/tickets/${id}`,
+        },
+        USERS: {
+            LIST: '/admin/users',
+            PROFILE: (id: string) => `/admin/users/${id}`,
+        },
         FORMS: {
             LIST: '/admin/forms',
             CREATE: '/admin/forms/create',

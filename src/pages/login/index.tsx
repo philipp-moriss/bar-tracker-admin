@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/core/components/ui/button";
 import {
@@ -21,22 +22,27 @@ import {
   FormLabel,
   FormMessage,
 } from "@/core/components/ui/form";
-import { AdminLoginDto } from "@/core/types/auth";
 import { LanguageSwitcher } from "@/core/feauture/language/LanguageSwitcher";
+import { authService } from "@/core/services/authService";
+import { useAuthStore } from "@/core/stores/authStore";
+import { AnalyticsService } from "@/core/services/analyticsService";
+import { useEffect } from "react";
 
-// Схема валидации для формы логина
+// Login form validation schema
 const loginSchema = z.object({
-  email: z.string().min(1, "Email обязателен").email("Неверный формат email"),
+  email: z.string().min(1, "Email is required").email("Invalid email format"),
   password: z
     .string()
-    .min(1, "Пароль обязателен")
-    .min(6, "Пароль должен содержать минимум 6 символов"),
+    .min(1, "Password is required")
+    .min(6, "Password must contain at least 6 characters"),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export const LoginPage = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const { login } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -48,38 +54,36 @@ export const LoginPage = () => {
     },
   });
 
+  // Логируем посещение страницы входа
+  useEffect(() => {
+    AnalyticsService.logPageView('Admin Login Page')
+  }, []);
+
   const onSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
     try {
-      // Здесь будет API вызов для логина
-      const _loginData: AdminLoginDto = {
+      const response = await authService.login({
         email: data.email,
         password: data.password,
-      };
+      });
 
-      // Имитация API вызова
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // В реальном приложении здесь будет вызов API
-      // const response = await loginApi(loginData)
-
-      // Имитация успешного ответа
-      const mockResponse = {
-        access_token: "mock-access-token",
-        refresh_token: "mock-refresh-token",
-        email: data.email,
-        userId: 1,
-      };
-
-      console.log(mockResponse, "mockResponse");
-
-      // Перенаправление на главную страницу
-      window.location.href = "/admin";
+      if (response.success && response.user) {
+        // Сохраняем пользователя в store
+        login(response.user);
+        
+        // Перенаправляем на главную страницу админки
+        navigate("/admin");
+      } else {
+        form.setError("root", {
+          type: "manual",
+          message: response.error || "Error logging into the system",
+        });
+      }
     } catch (error) {
-      console.error("Ошибка входа:", error);
+      console.error("Login error:", error);
       form.setError("root", {
         type: "manual",
-        message: "Неверный email или пароль",
+        message: "Error logging into the system",
       });
     } finally {
       setIsLoading(false);
@@ -198,13 +202,7 @@ export const LoginPage = () => {
 
             <div className="mt-6 text-center">
               <p className="text-sm text-barTrekker-darkGrey/70">
-                {t("auth.login.noAccount")}{" "}
-                <a
-                  href="/register"
-                  className="text-barTrekker-orange hover:text-barTrekker-orange/80 font-medium transition-colors"
-                >
-                  {t("auth.login.registerLink")}
-                </a>
+                Login to BarTrekker Admin Panel
               </p>
             </div>
           </CardContent>
