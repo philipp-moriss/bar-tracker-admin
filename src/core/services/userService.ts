@@ -4,6 +4,7 @@ import {
   getDocs, 
   getDoc, 
   addDoc, 
+  setDoc,
   updateDoc, 
   deleteDoc, 
   query, 
@@ -26,9 +27,23 @@ import {
 } from '@/core/types/user'
 
 export class UserService {
-  private readonly usersCollection = collection(db, 'users')
-  private readonly userProfilesCollection = collection(db, 'userProfiles')
+  private readonly profilesCollection = collection(db, 'profiles')
   private readonly userActivitiesCollection = collection(db, 'userActivities')
+
+  // Remove undefined values to satisfy Firestore constraints
+  private sanitizeForFirestore<T extends Record<string, any>>(data: T): T {
+    const sanitized: Record<string, any> = {}
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) sanitized[key] = value
+    }
+    return sanitized as T
+  }
+
+  // Helper function to safely get date from Firestore timestamp or Date
+  private getDate(date: any): Date {
+    if (!date) return new Date(0) // Default to epoch if no date
+    return date instanceof Date ? date : date.toDate()
+  }
 
   /**
    * Get all users with optional filters
@@ -36,22 +51,25 @@ export class UserService {
   async getUsers(filters?: UserFilters): Promise<User[]> {
     try {
       // Use the most basic query possible - no orderBy, no where clauses
-      const q = query(this.usersCollection)
+      const q = query(this.profilesCollection)
       const snapshot = await getDocs(q)
       
-      let users = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate() || doc.data().updatedAt,
-        lastLoginAt: doc.data().lastLoginAt?.toDate() || doc.data().lastLoginAt,
-        blockedAt: doc.data().blockedAt?.toDate() || doc.data().blockedAt,
-      })) as User[]
+      let users = snapshot.docs.map(doc => {
+        const data = doc.data()
+        return {
+          ...data,
+          createdAt: this.getDate(data.createdAt),
+          updatedAt: this.getDate(data.updatedAt),
+          lastLoginAt: data.lastLoginAt ? this.getDate(data.lastLoginAt) : undefined,
+          blockedAt: data.blockedAt ? this.getDate(data.blockedAt) : undefined,
+          id: doc.id,
+        }
+      }) as User[]
 
       // Sort client-side by createdAt (newest first)
       users = users.sort((a, b) => {
-        const dateA = a.createdAt instanceof Date ? a.createdAt : a.createdAt.toDate()
-        const dateB = b.createdAt instanceof Date ? b.createdAt : b.createdAt.toDate()
+        const dateA = this.getDate(a.createdAt)
+        const dateB = this.getDate(b.createdAt)
         return dateB.getTime() - dateA.getTime()
       })
 
@@ -81,14 +99,14 @@ export class UserService {
       if (filters?.dateFrom) {
         const dateFrom = filters.dateFrom
         users = users.filter(user => {
-          const userDate = user.createdAt instanceof Date ? user.createdAt : user.createdAt.toDate()
+          const userDate = this.getDate(user.createdAt)
           return userDate >= dateFrom
         })
       }
       if (filters?.dateTo) {
         const dateTo = filters.dateTo
         users = users.filter(user => {
-          const userDate = user.createdAt instanceof Date ? user.createdAt : user.createdAt.toDate()
+          const userDate = this.getDate(user.createdAt)
           return userDate <= dateTo
         })
       }
@@ -97,9 +115,9 @@ export class UserService {
     } catch (error) {
       console.error('Error getting users:', error)
       
-      // If no users collection exists, return empty array instead of throwing error
+      // If no profiles collection exists, return empty array instead of throwing error
       if ((error as any)?.code === 'failed-precondition' || (error as any)?.message?.includes('index')) {
-        console.warn('Users collection may not exist or require index. Returning empty array.')
+        console.warn('Profiles collection may not exist or require index. Returning empty array.')
         return []
       }
       
@@ -149,7 +167,8 @@ export class UserService {
         totalEvents: 0,
       }
 
-      await addDoc(this.usersCollection, userDoc)
+      const sanitizedUserDoc = this.sanitizeForFirestore(userDoc)
+      await setDoc(doc(this.profilesCollection, firebaseUser.uid), sanitizedUserDoc)
 
       // Log activity
       await this.logUserActivity(
@@ -161,11 +180,11 @@ export class UserService {
 
       return {
         id: firebaseUser.uid,
-        ...userDoc,
-        createdAt: userDoc.createdAt.toDate(),
-        updatedAt: userDoc.updatedAt.toDate(),
+        ...sanitizedUserDoc,
+        createdAt: this.getDate(sanitizedUserDoc.createdAt),
+        updatedAt: this.getDate(sanitizedUserDoc.updatedAt),
         lastLoginAt: undefined,
-        blockedAt: userDoc.blockedAt?.toDate() || undefined,
+        blockedAt: sanitizedUserDoc.blockedAt ? this.getDate(sanitizedUserDoc.blockedAt) : undefined,
       } as User
 
     } catch (error) {
@@ -175,8 +194,8 @@ export class UserService {
   }
 
   /**
-   * Sync users from other collections to users collection
-   * This method looks for user data in other collections and creates users collection entries
+   * Sync users from other collections to profiles collection
+   * This method looks for user data in other collections and creates profiles collection entries
    */
   async syncUsersFromOtherCollections(): Promise<{ synced: number; errors: string[] }> {
     try {
@@ -201,12 +220,14 @@ export class UserService {
               if (data.email || data.userId || data.uid) {
                 const userId = data.userId || data.uid || docSnap.id
                 
-                // Check if user already exists in users collection
+                // Check if user already exists in profiles collection
                 const existingUser = await this.getUserById(userId)
-                if (!existingUser) {
+                // Dedupe: also check by email if id-based document not found
+                const email: string | undefined = data.email || ''
+                const existingByEmail = email ? await this.getUserByEmail(email) : null
+                if (!existingUser && !existingByEmail) {
                   // Create user document
                   const userDoc = {
-                    id: userId,
                     name: data.name || data.displayName || 'Unknown User',
                     email: data.email || '',
                     phoneNumber: data.phoneNumber || data.phone || '',
@@ -224,9 +245,10 @@ export class UserService {
                     totalEvents: data.totalEvents || 0,
                   }
 
-                  await addDoc(this.usersCollection, userDoc)
+                  const sanitizedUserDoc = this.sanitizeForFirestore(userDoc)
+                  await setDoc(doc(this.profilesCollection, userId), sanitizedUserDoc)
                   synced++
-                  console.log(`Synced user: ${userDoc.name} (${userDoc.email})`)
+                  console.log(`Synced user: ${sanitizedUserDoc.name} (${sanitizedUserDoc.email})`)
                 }
               }
             }
@@ -249,7 +271,7 @@ export class UserService {
    */
   async getUserById(id: string): Promise<User | null> {
     try {
-      const docRef = doc(this.usersCollection, id)
+      const docRef = doc(this.profilesCollection, id)
       const docSnap = await getDoc(docRef)
 
       if (docSnap.exists()) {
@@ -257,10 +279,10 @@ export class UserService {
         return {
           id: docSnap.id,
           ...data,
-          createdAt: data.createdAt?.toDate() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate() || data.updatedAt,
-          lastLoginAt: data.lastLoginAt?.toDate() || data.lastLoginAt,
-          blockedAt: data.blockedAt?.toDate() || data.blockedAt,
+          createdAt: this.getDate(data.createdAt),
+          updatedAt: this.getDate(data.updatedAt),
+          lastLoginAt: data.lastLoginAt ? this.getDate(data.lastLoginAt) : undefined,
+          blockedAt: data.blockedAt ? this.getDate(data.blockedAt) : undefined,
         } as User
       }
 
@@ -276,7 +298,7 @@ export class UserService {
    */
   async getUserByEmail(email: string): Promise<User | null> {
     try {
-      const q = query(this.usersCollection, where('email', '==', email))
+      const q = query(this.profilesCollection, where('email', '==', email))
       const snapshot = await getDocs(q)
 
       if (!snapshot.empty) {
@@ -285,10 +307,10 @@ export class UserService {
         return {
           id: doc.id,
           ...data,
-          createdAt: data.createdAt?.toDate() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate() || data.updatedAt,
-          lastLoginAt: data.lastLoginAt?.toDate() || data.lastLoginAt,
-          blockedAt: data.blockedAt?.toDate() || data.blockedAt,
+          createdAt: this.getDate(data.createdAt),
+          updatedAt: this.getDate(data.updatedAt),
+          lastLoginAt: data.lastLoginAt ? this.getDate(data.lastLoginAt) : undefined,
+          blockedAt: data.blockedAt ? this.getDate(data.blockedAt) : undefined,
         } as User
       }
 
@@ -306,7 +328,7 @@ export class UserService {
    */
   async updateUser(id: string, userData: UpdateUserData): Promise<void> {
     try {
-      const docRef = doc(this.usersCollection, id)
+      const docRef = doc(this.profilesCollection, id)
       const updateData = {
         ...userData,
         updatedAt: Timestamp.fromDate(new Date()),
@@ -324,7 +346,7 @@ export class UserService {
    */
   async blockUser(id: string, reason?: string): Promise<void> {
     try {
-      const docRef = doc(this.usersCollection, id)
+      const docRef = doc(this.profilesCollection, id)
       await updateDoc(docRef, {
         isBlocked: true,
         status: UserStatus.BLOCKED,
@@ -346,7 +368,7 @@ export class UserService {
    */
   async unblockUser(id: string): Promise<void> {
     try {
-      const docRef = doc(this.usersCollection, id)
+      const docRef = doc(this.profilesCollection, id)
       await updateDoc(docRef, {
         isBlocked: false,
         status: UserStatus.ACTIVE,
@@ -368,7 +390,7 @@ export class UserService {
    */
   async changeUserRole(id: string, newRole: UserRole): Promise<void> {
     try {
-      const docRef = doc(this.usersCollection, id)
+      const docRef = doc(this.profilesCollection, id)
       await updateDoc(docRef, {
         role: newRole,
         updatedAt: Timestamp.fromDate(new Date()),
@@ -387,7 +409,7 @@ export class UserService {
    */
   async deleteUser(id: string): Promise<void> {
     try {
-      const docRef = doc(this.usersCollection, id)
+      const docRef = doc(this.profilesCollection, id)
       await deleteDoc(docRef)
     } catch (error) {
       console.error('Error deleting user:', error)
@@ -396,28 +418,25 @@ export class UserService {
   }
 
   /**
-   * Get user profile
+   * Get user profile (now merged with user data)
    */
   async getUserProfile(userId: string): Promise<UserProfile | null> {
     try {
-      const q = query(this.userProfilesCollection, where('userId', '==', userId))
-      const snapshot = await getDocs(q)
+      const user = await this.getUserById(userId)
+      if (!user) return null
 
-      if (!snapshot.empty) {
-        const doc = snapshot.docs[0]
-        const data = doc.data()
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate() || data.updatedAt,
-        } as UserProfile
+      return {
+        id: user.id,
+        userId: user.id,
+        bio: user.bio,
+        location: user.location,
+        preferences: user.preferences,
+        socialLinks: user.socialLinks,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
       }
-
-      return null
     } catch (error) {
       console.error('Error getting user profile:', error)
-      // Return null instead of throwing error for optional profile
       return null
     }
   }
@@ -437,14 +456,14 @@ export class UserService {
       let activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || doc.data().createdAt,
+        createdAt: this.getDate(doc.data().createdAt),
       })) as UserActivity[]
 
       // Sort client-side and limit
       activities = activities
         .sort((a, b) => {
-          const dateA = a.createdAt instanceof Date ? a.createdAt : a.createdAt.toDate()
-          const dateB = b.createdAt instanceof Date ? b.createdAt : b.createdAt.toDate()
+          const dateA = this.getDate(a.createdAt)
+          const dateB = this.getDate(b.createdAt)
           return dateB.getTime() - dateA.getTime()
         })
         .slice(0, limit)
@@ -475,7 +494,63 @@ export class UserService {
   }
 
   /**
-   * Get user statistics
+   * Remove duplicate users based on email from profiles collection
+   * Keeps the first user with each email, removes the rest
+   */
+  async removeDuplicateUsers(): Promise<{ removed: number; errors: string[] }> {
+    try {
+      const errors: string[] = []
+      let removed = 0
+
+      // Get all users
+      const users = await this.getUsers()
+      
+      // Group users by email
+      const usersByEmail = new Map<string, User[]>()
+      users.forEach(user => {
+        if (user.email) {
+          if (!usersByEmail.has(user.email)) {
+            usersByEmail.set(user.email, [])
+          }
+          usersByEmail.get(user.email)!.push(user)
+        }
+      })
+
+      // Process each email group
+      for (const [, userGroup] of usersByEmail) {
+        if (userGroup.length > 1) {
+          // Sort by createdAt to keep the oldest (first created)
+          const sortedUsers = userGroup.sort((a, b) => {
+            const dateA = this.getDate(a.createdAt)
+            const dateB = this.getDate(b.createdAt)
+            return dateA.getTime() - dateB.getTime()
+          })
+
+          // Keep the first user, remove the rest
+          const usersToRemove = sortedUsers.slice(1)
+          
+          for (const userToRemove of usersToRemove) {
+            try {
+              await this.deleteUser(userToRemove.id)
+              removed++
+              console.log(`Removed duplicate user: ${userToRemove.name} (${userToRemove.email})`)
+            } catch (error) {
+              console.error(`Error removing duplicate user ${userToRemove.id}:`, error)
+              errors.push(`Failed to remove user ${userToRemove.id}`)
+            }
+          }
+        }
+      }
+
+      return { removed, errors }
+    } catch (error) {
+      console.error('Error removing duplicates:', error)
+      return { removed: 0, errors: ['Failed to remove duplicates'] }
+    }
+  }
+
+  /**
+   * Get user statistics from profiles collection
    */
   async getUserStats(): Promise<UserStats> {
     try {
@@ -494,7 +569,7 @@ export class UserService {
           return acc
         }, {} as { [status: string]: number }),
         newUsersThisMonth: users.filter(user => {
-          const userDate = user.createdAt instanceof Date ? user.createdAt : user.createdAt.toDate()
+          const userDate = this.getDate(user.createdAt)
           const now = new Date()
           const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
           return userDate >= monthAgo

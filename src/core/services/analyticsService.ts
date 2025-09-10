@@ -1,73 +1,55 @@
 import { analytics } from '@/modules/firebase/config'
 import { logEvent } from 'firebase/analytics'
 
-export class AnalyticsService {
-  /**
-   * Логирует событие входа администратора
-   */
-  static logAdminLogin() {
+export const AnalyticsService = {
+  logAdminLogin(): void {
     if (analytics) {
       logEvent(analytics, 'admin_login', {
         event_category: 'authentication',
         event_label: 'admin'
       })
     }
-  }
+  },
 
-  /**
-   * Логирует событие выхода администратора
-   */
-  static logAdminLogout() {
+  logAdminLogout(): void {
     if (analytics) {
       logEvent(analytics, 'admin_logout', {
         event_category: 'authentication',
         event_label: 'admin'
       })
     }
-  }
+  },
 
-  /**
-   * Логирует создание администратора
-   */
-  static logAdminCreated() {
+  logAdminCreated(): void {
     if (analytics) {
       logEvent(analytics, 'admin_created', {
         event_category: 'setup',
         event_label: 'admin'
       })
     }
-  }
+  },
 
-  /**
-   * Логирует ошибку аутентификации
-   */
-  static logAuthError(errorCode: string) {
+  logAuthError(errorCode: string): void {
     if (analytics) {
       logEvent(analytics, 'auth_error', {
         event_category: 'authentication',
         event_label: errorCode
       })
     }
-  }
+  },
 
-  /**
-   * Логирует посещение страницы
-   */
-  static logPageView(pageName: string) {
+  logPageView(pageName: string): void {
     if (analytics) {
       logEvent(analytics, 'page_view', {
         page_title: pageName,
         page_location: window.location.href
       })
     }
-  }
+  },
 
-  /**
-   * Логирует пользовательское событие
-   */
-  static logCustomEvent(eventName: string, parameters?: Record<string, any>) {
+  logCustomEvent(eventName: string, parameters?: Record<string, unknown>): void {
     if (analytics) {
-      logEvent(analytics, eventName, parameters)
+      logEvent(analytics, eventName, parameters as Record<string, any>)
     }
-  }
-}
+  },
+} as const

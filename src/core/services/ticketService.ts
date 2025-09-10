@@ -1,30 +1,30 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
   orderBy,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore'
 import { db } from '@/modules/firebase/config'
-import { 
-  Ticket, 
-  TicketGroup, 
-  Purchase, 
-  TicketFilters, 
-  TicketStats, 
-  TicketStatus, 
+import {
+  Ticket,
+  TicketGroup,
+  Purchase,
+  TicketFilters,
+  TicketStats,
+  TicketStatus,
   PurchaseStatus,
-  QRCodeData 
+  QRCodeData
 } from '@/core/types/ticket'
 
 export class TicketService {
-  private readonly ticketsCollection = collection(db, 'tickets')
+  private readonly ticketsCollection = collection(db, 'ticketGroups') // Билеты хранятся в ticketGroups
   private readonly ticketGroupsCollection = collection(db, 'ticketGroups')
   private readonly purchasesCollection = collection(db, 'purchases')
 
@@ -33,43 +33,105 @@ export class TicketService {
    */
   async getTickets(filters?: TicketFilters): Promise<Ticket[]> {
     try {
-      let q = query(this.ticketsCollection, orderBy('purchaseDate', 'desc'))
 
+      // Читаем из обеих коллекций: ticketGroups и tickets
+      const [ticketGroupsSnapshot, ticketsSnapshot] = await Promise.all([
+        getDocs(query(this.ticketGroupsCollection, orderBy('createdAt', 'desc'))),
+        getDocs(query(collection(db, 'tickets'), orderBy('createdAt', 'desc')))
+      ]);
+
+
+      // Обрабатываем ticketGroups
+      const ticketGroups = ticketGroupsSnapshot.docs.map((doc) => {
+        const data = doc.data();
+
+        return {
+          id: doc.id,
+          eventId: data.eventId || '',
+          userId: data.userId || data.pusherUserId || '',
+          inviteCode: data.inviteCode || '',
+          qrCode: data.qrCode || '',
+          status: data.status === 'active' ? TicketStatus.ACTIVE :
+            data.status === 'used' ? TicketStatus.USED :
+              data.status === 'cancelled' ? TicketStatus.CANCELLED :
+                data.status === 'expired' ? TicketStatus.EXPIRED :
+                  !data.status ? TicketStatus.ACTIVE : // Если статус undefined, считаем активным
+                    TicketStatus.ACTIVE, // По умолчанию ACTIVE для ticketGroups
+          purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
+          usedDate: data.usedDate?.toDate() || undefined,
+          price: data.price || 0,
+          currency: data.currency || 'USD',
+          paymentIntentId: data.paymentIntentId || data.paymentId || '',
+          paymentId: data.paymentId || '',
+          mainTicketId: data.mainTicketId || '',
+          groupName: data.groupName || '',
+          eventName: data.eventName || '',
+          eventDate: data.eventDate?.toDate() || undefined,
+          eventLocation: data.eventLocation || '',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Ticket;
+      });
+
+      // Обрабатываем tickets (тестовые данные)
+      const tickets = ticketsSnapshot.docs.map((doc) => {
+        const data = doc.data();
+
+        return {
+          id: doc.id,
+          eventId: data.eventId || '',
+          userId: data.userId || '',
+          inviteCode: data.inviteCode || '',
+          qrCode: data.qrCode || '',
+          status: data.status === 'scanned' ? TicketStatus.SCANNED :
+            data.status === 'unscanned' ? TicketStatus.ACTIVE :
+              data.status === 'paid' ? TicketStatus.ACTIVE :
+                data.status === 'confirmed' ? TicketStatus.ACTIVE :
+                  TicketStatus.ACTIVE, // По умолчанию ACTIVE для tickets
+          purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
+          usedDate: data.status === 'scanned' ? (data.scannedAt?.toDate() || new Date()) : undefined,
+          price: data.price || data.amount || 0,
+          currency: data.currency || 'USD',
+          paymentIntentId: data.paymentIntentId || data.paymentId || '',
+          paymentId: data.paymentId || '',
+          mainTicketId: data.mainTicketId || '',
+          groupName: data.groupName || '',
+          eventName: data.eventName || '',
+          eventDate: data.eventDate?.toDate() || undefined,
+          eventLocation: data.eventLocation || '',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        } as Ticket;
+      });
+
+      // Объединяем результаты
+      let allTickets = [...ticketGroups, ...tickets];
+
+      // Применяем фильтры
       if (filters?.status) {
-        q = query(q, where('status', '==', filters.status))
+        allTickets = allTickets.filter(ticket => ticket.status === filters.status);
       }
 
       if (filters?.eventId) {
-        q = query(q, where('eventId', '==', filters.eventId))
+        allTickets = allTickets.filter(ticket => ticket.eventId === filters.eventId);
       }
 
       if (filters?.userId) {
-        q = query(q, where('userId', '==', filters.userId))
+        allTickets = allTickets.filter(ticket => ticket.userId === filters.userId);
       }
 
       if (filters?.dateFrom) {
-        q = query(q, where('purchaseDate', '>=', Timestamp.fromDate(filters.dateFrom)))
+        allTickets = allTickets.filter(ticket => ticket.purchaseDate >= filters.dateFrom!);
       }
 
       if (filters?.dateTo) {
-        q = query(q, where('purchaseDate', '<=', Timestamp.fromDate(filters.dateTo)))
+        allTickets = allTickets.filter(ticket => ticket.purchaseDate <= filters.dateTo!);
       }
-
-      const snapshot = await getDocs(q)
-      let tickets = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        purchaseDate: doc.data().purchaseDate?.toDate() || doc.data().purchaseDate,
-        usedDate: doc.data().usedDate?.toDate() || doc.data().usedDate,
-        eventDate: doc.data().eventDate?.toDate() || doc.data().eventDate,
-        createdAt: doc.data().createdAt?.toDate() || doc.data().createdAt,
-        updatedAt: doc.data().updatedAt?.toDate() || doc.data().updatedAt,
-      })) as Ticket[]
 
       // Client-side filtering for search and invite code
       if (filters?.search) {
         const searchLower = filters.search.toLowerCase()
-        tickets = tickets.filter(ticket => 
+        allTickets = allTickets.filter(ticket =>
           ticket.inviteCode.toLowerCase().includes(searchLower) ||
           ticket.eventName?.toLowerCase().includes(searchLower) ||
           ticket.eventLocation?.toLowerCase().includes(searchLower) ||
@@ -78,12 +140,12 @@ export class TicketService {
       }
 
       if (filters?.inviteCode) {
-        tickets = tickets.filter(ticket => 
+        allTickets = allTickets.filter(ticket =>
           ticket.inviteCode.toLowerCase().includes(filters.inviteCode!.toLowerCase())
         )
       }
 
-      return tickets
+      return allTickets;
     } catch (error) {
       console.error('Error getting tickets:', error)
       throw new Error('Failed to fetch tickets')
@@ -100,14 +162,33 @@ export class TicketService {
 
       if (docSnap.exists()) {
         const data = docSnap.data()
+
+        // Адаптируем данные из ticketGroups к интерфейсу Ticket
         return {
           id: docSnap.id,
-          ...data,
-          purchaseDate: data.purchaseDate?.toDate() || data.purchaseDate,
-          usedDate: data.usedDate?.toDate() || data.usedDate,
-          eventDate: data.eventDate?.toDate() || data.eventDate,
-          createdAt: data.createdAt?.toDate() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate() || data.updatedAt,
+          eventId: data.eventId || '',
+          userId: data.userId || data.pusherUserId || '',
+          inviteCode: data.inviteCode || '',
+          qrCode: data.qrCode || '',
+          status: data.status === 'active' ? TicketStatus.ACTIVE :
+            data.status === 'used' ? TicketStatus.USED :
+              data.status === 'cancelled' ? TicketStatus.CANCELLED :
+                data.status === 'expired' ? TicketStatus.EXPIRED :
+                  !data.status ? TicketStatus.ACTIVE :
+                    TicketStatus.ACTIVE,
+          purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
+          usedDate: data.usedDate?.toDate() || undefined,
+          price: data.price || 0,
+          currency: data.currency || 'USD',
+          paymentIntentId: data.paymentIntentId || data.paymentId || '',
+          paymentId: data.paymentId || '',
+          mainTicketId: data.mainTicketId || '',
+          groupName: data.groupName || '',
+          eventName: data.eventName || '',
+          eventDate: data.eventDate?.toDate() || undefined,
+          eventLocation: data.eventLocation || '',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
         } as Ticket
       }
 
@@ -131,12 +212,29 @@ export class TicketService {
         const data = doc.data()
         return {
           id: doc.id,
-          ...data,
-          purchaseDate: data.purchaseDate?.toDate() || data.purchaseDate,
-          usedDate: data.usedDate?.toDate() || data.usedDate,
-          eventDate: data.eventDate?.toDate() || data.eventDate,
-          createdAt: data.createdAt?.toDate() || data.createdAt,
-          updatedAt: data.updatedAt?.toDate() || data.updatedAt,
+          eventId: data.eventId || '',
+          userId: data.userId || data.pusherUserId || '',
+          inviteCode: data.inviteCode || '',
+          qrCode: data.qrCode || '',
+          status: data.status === 'active' ? TicketStatus.ACTIVE :
+            data.status === 'used' ? TicketStatus.USED :
+              data.status === 'cancelled' ? TicketStatus.CANCELLED :
+                data.status === 'expired' ? TicketStatus.EXPIRED :
+                  !data.status ? TicketStatus.ACTIVE :
+                    TicketStatus.ACTIVE,
+          purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
+          usedDate: data.usedDate?.toDate() || undefined,
+          price: data.price || 0,
+          currency: data.currency || 'USD',
+          paymentIntentId: data.paymentIntentId || data.paymentId || '',
+          paymentId: data.paymentId || '',
+          mainTicketId: data.mainTicketId || '',
+          groupName: data.groupName || '',
+          eventName: data.eventName || '',
+          eventDate: data.eventDate?.toDate() || undefined,
+          eventLocation: data.eventLocation || '',
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
         } as Ticket
       }
 
@@ -152,17 +250,58 @@ export class TicketService {
    */
   async updateTicketStatus(id: string, status: TicketStatus, usedDate?: Date): Promise<void> {
     try {
-      const docRef = doc(this.ticketsCollection, id)
-      const updateData: any = {
-        status,
+      // Определяем, в какой коллекции находится билет
+      let docRef;
+      let updateData: any = {
         updatedAt: Timestamp.fromDate(new Date()),
+      };
+
+      // Сначала пробуем найти в ticketGroups
+      try {
+        docRef = doc(this.ticketGroupsCollection, id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          // Билет найден в ticketGroups
+          updateData.status = status;
+          if (status === TicketStatus.USED && usedDate) {
+            updateData.usedDate = Timestamp.fromDate(usedDate);
+          }
+          await updateDoc(docRef, updateData);
+          return;
+        }
+      } catch (error) {
       }
 
-      if (status === TicketStatus.USED && usedDate) {
-        updateData.usedDate = Timestamp.fromDate(usedDate)
+      // Если не найден в ticketGroups, пробуем в tickets
+      try {
+        docRef = doc(collection(db, 'tickets'), id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          // Билет найден в tickets - адаптируем статус
+          if (status === TicketStatus.USED || status === TicketStatus.SCANNED) {
+            updateData.status = 'scanned';
+            if (usedDate) {
+              updateData.scannedAt = Timestamp.fromDate(usedDate);
+            }
+          } else if (status === TicketStatus.ACTIVE) {
+            updateData.status = 'unscanned';
+          } else if (status === TicketStatus.CANCELLED) {
+            updateData.status = 'cancelled';
+          } else {
+            updateData.status = status.toLowerCase();
+          }
+
+          await updateDoc(docRef, updateData);
+          return;
+        }
+      } catch (error) {
       }
 
-      await updateDoc(docRef, updateData)
+      // Если билет не найден ни в одной коллекции
+      throw new Error(`Ticket with ID ${id} not found in any collection`);
+
     } catch (error) {
       console.error('Error updating ticket status:', error)
       throw new Error('Failed to update ticket status')
@@ -181,6 +320,58 @@ export class TicketService {
    */
   async cancelTicket(id: string): Promise<void> {
     await this.updateTicketStatus(id, TicketStatus.CANCELLED)
+  }
+
+  /**
+   * Restore cancelled ticket to active
+   */
+  async restoreTicket(id: string): Promise<void> {
+    await this.updateTicketStatus(id, TicketStatus.ACTIVE)
+  }
+
+  /**
+   * Restore used ticket to active
+   */
+  async restoreUsedTicket(id: string): Promise<void> {
+    await this.updateTicketStatus(id, TicketStatus.ACTIVE)
+  }
+
+  /**
+   * Delete ticket
+   */
+  async deleteTicket(id: string): Promise<void> {
+    try {
+      // Сначала пробуем найти и удалить из ticketGroups
+      try {
+        const docRef = doc(this.ticketGroupsCollection, id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          await deleteDoc(docRef);
+          return;
+        }
+      } catch (error) {
+      }
+
+      // Если не найден в ticketGroups, пробуем в tickets
+      try {
+        const docRef = doc(collection(db, 'tickets'), id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          await deleteDoc(docRef);
+          return;
+        }
+      } catch (error) {
+      }
+
+      // Если билет не найден ни в одной коллекции
+      throw new Error(`Ticket with ID ${id} not found in any collection`);
+
+    } catch (error) {
+      console.error('Error deleting ticket:', error)
+      throw new Error('Failed to delete ticket')
+    }
   }
 
   /**
@@ -250,15 +441,15 @@ export class TicketService {
   async getTicketStats(): Promise<TicketStats> {
     try {
       const tickets = await this.getTickets()
-      
+
       const stats: TicketStats = {
         totalTickets: tickets.length,
         activeTickets: tickets.filter(t => t.status === TicketStatus.ACTIVE).length,
-        usedTickets: tickets.filter(t => t.status === TicketStatus.USED).length,
+        usedTickets: tickets.filter(t => t.status === TicketStatus.USED || t.status === TicketStatus.SCANNED).length,
         cancelledTickets: tickets.filter(t => t.status === TicketStatus.CANCELLED).length,
         totalRevenue: tickets.reduce((sum, ticket) => sum + ticket.price, 0),
-        averageTicketPrice: tickets.length > 0 
-          ? tickets.reduce((sum, ticket) => sum + ticket.price, 0) / tickets.length 
+        averageTicketPrice: tickets.length > 0
+          ? tickets.reduce((sum, ticket) => sum + ticket.price, 0) / tickets.length
           : 0,
         ticketsByEvent: tickets.reduce((acc, ticket) => {
           acc[ticket.eventId] = (acc[ticket.eventId] || 0) + 1
@@ -283,7 +474,7 @@ export class TicketService {
   validateQRCode(qrData: string): QRCodeData | null {
     try {
       const data = JSON.parse(qrData) as QRCodeData
-      
+
       // Validate required fields
       if (!data.ticketId || !data.inviteCode || !data.eventId || !data.userId) {
         return null

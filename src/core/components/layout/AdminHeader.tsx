@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Menu, Bell, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, User, LogOut, ChevronDown } from 'lucide-react';
 import { Button } from '@/core/components/ui/button';
 import { useAuthStore } from '@/core/stores/authStore';
 import { useNavigate } from 'react-router-dom';
@@ -65,19 +65,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right side - Notifications and User */}
+        {/* Right side - User */}
         <div className="flex items-center space-x-4">
-          {/* Notifications */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="relative"
-          >
-            <Bell className="h-5 w-5" />
-            {/* Notification badge */}
-            <span className="absolute -top-1 -right-1 h-3 w-3 bg-red-500 rounded-full"></span>
-          </Button>
-
           {/* User Menu */}
           <div className="relative" ref={userMenuRef}>
             <button

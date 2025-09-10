@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Edit, Trash2, Eye, Calendar, MapPin, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Calendar, MapPin, DollarSign } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 
 import { Button } from '@/core/components/ui/button';
@@ -23,6 +23,9 @@ import { Badge } from '@/core/components/ui/badge';
 import { eventService } from '@/core/services/eventService';
 import { Event, EventStatus, EventFilters } from '@/core/types/event';
 import { AnalyticsService } from '@/core/services/analyticsService';
+import { EventViewModal } from '@/core/components/ui/modals/EventViewModal';
+import { EventEditModal } from '@/core/components/ui/modals/EventEditModal';
+import { DeleteConfirmModal } from '@/core/components/ui/modals/DeleteConfirmModal';
 
 export const AdminEventsPage = () => {
   const navigate = useNavigate();
@@ -30,7 +33,16 @@ export const AdminEventsPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<EventStatus | ''>('');
+  const [sortBy, setSortBy] = useState<EventFilters['sortBy']>('startTime');
+  const [sortDir, setSortDir] = useState<EventFilters['sortDir']>('desc');
   const [error, setError] = useState<string | null>(null);
+  
+  // Modal states
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Load events on component mount
   useEffect(() => {
@@ -46,6 +58,8 @@ export const AdminEventsPage = () => {
       const filters: EventFilters = {
         search: searchTerm || undefined,
         status: statusFilter || undefined,
+        sortBy,
+        sortDir,
       };
 
       const eventsData = await eventService.getEvents(filters);
@@ -65,43 +79,58 @@ export const AdminEventsPage = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, statusFilter]);
+  }, [searchTerm, statusFilter, sortBy, sortDir]);
+
+  const toggleSort = (field: NonNullable<EventFilters['sortBy']>) => {
+    if (sortBy === field) {
+      setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(field)
+      setSortDir('asc')
+    }
+  };
 
   const handleCreateEvent = () => {
     navigate('/admin/events/create');
   };
 
-  const handleEditEvent = (eventId: string) => {
-    navigate(`/admin/events/${eventId}/edit`);
+  const handleViewEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setViewModalOpen(true);
   };
 
-  const handleViewEvent = (eventId: string) => {
-    navigate(`/admin/events/${eventId}`);
+  const handleEditEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setEditModalOpen(true);
   };
 
-  const handleDeleteEvent = async (eventId: string, eventName: string) => {
-    if (window.confirm(`Are you sure you want to delete "${eventName}"?`)) {
-      try {
-        await eventService.deleteEvent(eventId);
-        await loadEvents();
-        AnalyticsService.logCustomEvent('event_deleted', { eventId });
-      } catch (err) {
-        setError('Failed to delete event');
-        console.error('Error deleting event:', err);
-      }
-    }
+  const handleDeleteEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setDeleteModalOpen(true);
   };
 
-  const handleStatusChange = async (eventId: string, newStatus: EventStatus) => {
+  const confirmDeleteEvent = async () => {
+    if (!selectedEvent) return;
+
     try {
-      await eventService.updateEventStatus(eventId, newStatus);
+      setDeleteLoading(true);
+      await eventService.deleteEvent(selectedEvent.id!);
       await loadEvents();
-      AnalyticsService.logCustomEvent('event_status_changed', { eventId, newStatus });
+      setDeleteModalOpen(false);
+      setSelectedEvent(null);
+      AnalyticsService.logCustomEvent('event_deleted', { eventId: selectedEvent.id });
     } catch (err) {
-      setError('Failed to update event status');
-      console.error('Error updating event status:', err);
+      setError('Failed to delete event');
+      console.error('Error deleting event:', err);
+    } finally {
+      setDeleteLoading(false);
     }
   };
+
+  const handleEventSaved = () => {
+    loadEvents();
+  };
+
 
   const getStatusBadge = (status: EventStatus) => {
     const statusConfig = {
@@ -115,9 +144,9 @@ export const AdminEventsPage = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const formatDate = (date: Date | any) => {
+  const formatDate = (date: Date | unknown) => {
     if (!date) return 'N/A';
-    const d = date instanceof Date ? date : date.toDate();
+    const d = date instanceof Date ? date : (date as any).toDate();
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   };
 
@@ -207,11 +236,46 @@ export const AdminEventsPage = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Date & Time</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Price</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>
+                        <button className="flex items-center gap-1" onClick={() => toggleSort('name')}>
+                          Event
+                          {sortBy === 'name' && (
+                            <span className="text-xs text-gray-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button className="flex items-center gap-1" onClick={() => toggleSort('startTime')}>
+                          Date & Time
+                          {sortBy === 'startTime' && (
+                            <span className="text-xs text-gray-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button className="flex items-center gap-1" onClick={() => toggleSort('startLocationName' as any)}>
+                          Location
+                          {sortBy === ('startLocationName' as any) && (
+                            <span className="text-xs text-gray-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button className="flex items-center gap-1" onClick={() => toggleSort('price')}>
+                          Price
+                          {sortBy === 'price' && (
+                            <span className="text-xs text-gray-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </button>
+                      </TableHead>
+                      <TableHead>
+                        <button className="flex items-center gap-1" onClick={() => toggleSort('status')}>
+                          Status
+                          {sortBy === 'status' && (
+                            <span className="text-xs text-gray-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </button>
+                      </TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -251,22 +315,25 @@ export const AdminEventsPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleViewEvent(event.id!)}
+                              onClick={() => handleViewEvent(event)}
+                              title="View Event"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleEditEvent(event.id!)}
+                              onClick={() => handleEditEvent(event)}
+                              title="Edit Event"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteEvent(event.id!, event.name)}
+                              onClick={() => handleDeleteEvent(event)}
                               className="text-red-600 hover:text-red-700"
+                              title="Delete Event"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -280,6 +347,36 @@ export const AdminEventsPage = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Modals */}
+        <EventViewModal
+          open={viewModalOpen}
+          onOpenChange={setViewModalOpen}
+          event={selectedEvent}
+          onEdit={(eventId) => {
+            const event = events.find(e => e.id === eventId);
+            if (event) {
+              setSelectedEvent(event);
+              setViewModalOpen(false);
+              setEditModalOpen(true);
+            }
+          }}
+        />
+
+        <EventEditModal
+          open={editModalOpen}
+          onOpenChange={setEditModalOpen}
+          event={selectedEvent}
+          onSave={handleEventSaved}
+        />
+
+        <DeleteConfirmModal
+          open={deleteModalOpen}
+          onOpenChange={setDeleteModalOpen}
+          onConfirm={confirmDeleteEvent}
+          loading={deleteLoading}
+          textKey={`Are you sure you want to delete "${selectedEvent?.name}"?`}
+        />
       </div>
     </AdminLayout>
   );

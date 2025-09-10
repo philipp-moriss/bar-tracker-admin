@@ -1,5 +1,4 @@
 import React from "react";
-import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogTrigger,
@@ -31,13 +30,10 @@ export const Modal: React.FC<ModalProps> = ({
   trigger,
   className,
 }) => {
-  const { i18n } = useTranslation();
-  const isRTL = i18n.language === 'ar' || i18n.language === 'he';
-  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-      <DialogContent className={className} dir={isRTL ? 'rtl' : 'ltr'}>
+      <DialogContent className={className}>
         {(title || description) && (
           <DialogHeader>
             {title && <DialogTitle>{title}</DialogTitle>}

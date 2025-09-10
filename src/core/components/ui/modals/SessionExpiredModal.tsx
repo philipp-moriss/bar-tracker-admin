@@ -1,4 +1,3 @@
-import { useTranslation } from 'react-i18next'
 import { useAuthStore } from '@/core/stores/authStore'
 import {
     Dialog,
@@ -11,9 +10,7 @@ import {
 import { Button } from '@/core/components/ui/button';
 
 export const SessionExpiredModal = () => {
-    const { t, i18n } = useTranslation()
     const { sessionExpired, setSessionExpired } = useAuthStore()
-    const isRTL = i18n.language === 'ar' || i18n.language === 'he';
 
     const handleLoginRedirect = () => {
         setSessionExpired(false)
@@ -22,16 +19,16 @@ export const SessionExpiredModal = () => {
 
     return (
         <Dialog open={sessionExpired} onOpenChange={setSessionExpired}>
-            <DialogContent dir={isRTL ? 'rtl' : 'ltr'}>
+            <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t('sessionExpired.title')}</DialogTitle>
+                    <DialogTitle>{'Session expired'}</DialogTitle>
                     <DialogDescription>
-                        {t('sessionExpired.description')}
+                        {'Your session has expired. Please log in again.'}
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                     <Button onClick={handleLoginRedirect}>
-                        {t('sessionExpired.login')}
+                        {'Login'}
                     </Button>
                 </DialogFooter>
             </DialogContent>

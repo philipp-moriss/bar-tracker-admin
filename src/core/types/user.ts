@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore'
 
-// User types based on mobile app structure
+// User types based on profiles collection
 export interface User {
   id: string
   name: string
@@ -21,6 +21,11 @@ export interface User {
   totalEvents?: number
   totalTickets?: number
   totalSpent?: number
+  // Profile fields merged from profiles collection
+  bio?: string
+  location?: string
+  preferences?: UserPreferences
+  socialLinks?: SocialLinks
 }
 
 export interface UserProfile {

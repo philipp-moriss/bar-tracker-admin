@@ -1,297 +1,411 @@
-import { useState, useEffect } from 'react'
-import { AdminLayout } from '@/core/components/layout/AdminLayout'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/core/components/ui/card'
-import { Button } from '@/core/components/ui/button'
-import { Badge } from '@/core/components/ui/badge'
-import { collection, getDocs, getFirestore } from 'firebase/firestore'
-import { firebaseApp } from '@/modules/firebase/config'
-import { Database, Users, FileText, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
-
-interface CollectionInfo {
-  name: string
-  count: number
-  sampleDocs: any[]
-  hasUserData: boolean
-}
+import React, { useState, useEffect } from 'react';
+import { collection, getDocs, addDoc, Timestamp, query, where } from 'firebase/firestore';
+import { db } from '@/modules/firebase/config';
+import { AdminLayout } from '@/core/components/layout/AdminLayout';
+import { Button } from '@/core/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/core/components/ui/card';
+import { Input } from '@/core/components/ui/inputs/input';
 
 export default function AdminDebugPage() {
-  const [collections, setCollections] = useState<CollectionInfo[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Common collection names to check
-  const commonCollections = [
-    'users', 'userProfiles', 'profiles', 'userData', 'accounts',
-    'events', 'tickets', 'ticketGroups', 'payments', 'transactions',
-    'notifications', 'settings', 'analytics', 'logs',
-    // Additional possible user collections
-    'customers', 'members', 'clients', 'participants', 'attendees',
-    'userAccounts', 'userInfo', 'userDetails', 'userSettings'
-  ]
-
-  const scanCollections = async () => {
-    setLoading(true)
-    setError(null)
-    const foundCollections: CollectionInfo[] = []
-
-    try {
-      const db = getFirestore(firebaseApp)
-
-      // First, try to get all collections (this might not work in client SDK)
-      // For now, we'll scan the predefined list
-      for (const collectionName of commonCollections) {
-        try {
-          const collectionRef = collection(db, collectionName)
-          const snapshot = await getDocs(collectionRef)
-          
-          if (!snapshot.empty) {
-            const sampleDocs = snapshot.docs.slice(0, 3).map(doc => ({
-              id: doc.id,
-              data: doc.data()
-            }))
-
-            // Check if this collection contains user data (more specific check)
-            const hasUserData = sampleDocs.some(doc => {
-              const data = doc.data
-              // Look for specific user-related fields
-              return (
-                (data.email && typeof data.email === 'string' && data.email.includes('@')) ||
-                (data.userId && typeof data.userId === 'string') ||
-                (data.uid && typeof data.uid === 'string') ||
-                (data.phoneNumber && typeof data.phoneNumber === 'string') ||
-                (data.role && ['user', 'bartender', 'admin'].includes(data.role)) ||
-                (data.status && ['active', 'inactive', 'blocked'].includes(data.status)) ||
-                // Check for user profile fields
-                (data.bio || data.preferences || data.socialLinks)
-              )
-            })
-
-            foundCollections.push({
-              name: collectionName,
-              count: snapshot.docs.length,
-              sampleDocs,
-              hasUserData
-            })
-          }
-        } catch (err) {
-          console.warn(`Could not access collection ${collectionName}:`, err)
-        }
-      }
-
-      // If no collections found, try some additional common names
-      if (foundCollections.length === 0) {
-        const additionalCollections = ['user', 'member', 'customer', 'client', 'participant']
-        for (const collectionName of additionalCollections) {
-          try {
-            const collectionRef = collection(db, collectionName)
-            const snapshot = await getDocs(collectionRef)
-            
-            if (!snapshot.empty) {
-              const sampleDocs = snapshot.docs.slice(0, 3).map(doc => ({
-                id: doc.id,
-                data: doc.data()
-              }))
-
-              const hasUserData = sampleDocs.some(doc => {
-                const data = doc.data
-                return (
-                  (data.email && typeof data.email === 'string' && data.email.includes('@')) ||
-                  (data.userId && typeof data.userId === 'string') ||
-                  (data.uid && typeof data.uid === 'string') ||
-                  (data.phoneNumber && typeof data.phoneNumber === 'string') ||
-                  (data.role && ['user', 'bartender', 'admin'].includes(data.role)) ||
-                  (data.status && ['active', 'inactive', 'blocked'].includes(data.status))
-                )
-              })
-
-              foundCollections.push({
-                name: collectionName,
-                count: snapshot.docs.length,
-                sampleDocs,
-                hasUserData
-              })
-            }
-          } catch (err) {
-            // Ignore errors for additional collections
-          }
-        }
-      }
-
-      setCollections(foundCollections)
-    } catch (err) {
-      setError('Failed to scan collections')
-      console.error('Error scanning collections:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const [ticketsCount, setTicketsCount] = useState(0);
+  const [eventsCount, setEventsCount] = useState(0);
+  const [usersCount, setUsersCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState('');
+  const [userTickets, setUserTickets] = useState<any[]>([]);
+  const [userTicketsLoading, setUserTicketsLoading] = useState(false);
+  const [allCollections, setAllCollections] = useState<Array<{name: string, count: number, sample?: any}>>([]);
 
   useEffect(() => {
-    scanCollections()
-  }, [])
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Check tickets collection
+      const ticketsSnapshot = await getDocs(collection(db, 'tickets'));
+      setTicketsCount(ticketsSnapshot.size);
+      
+      // Check other possible ticket collections
+      const possibleCollections = ['ticket', 'ticketGroups', 'purchases', 'userTickets', 'myTickets', 'profiles'];
+      console.log('Checking all collections...');
+      
+      const collectionsData: Array<{name: string, count: number, sample?: any}> = [];
+      
+      for (const collectionName of possibleCollections) {
+        try {
+          const snapshot = await getDocs(collection(db, collectionName));
+          console.log(`Collection '${collectionName}': ${snapshot.size} documents`);
+          
+          const collectionInfo = {
+            name: collectionName,
+            count: snapshot.size,
+            sample: snapshot.size > 0 ? snapshot.docs[0].data() : undefined
+          };
+          
+          collectionsData.push(collectionInfo);
+          
+          if (snapshot.size > 0) {
+            console.log(`Found data in '${collectionName}':`, snapshot.docs[0].data());
+          }
+        } catch (error) {
+          console.log(`Collection '${collectionName}' does not exist or no access`);
+          collectionsData.push({ name: collectionName, count: 0 });
+        }
+      }
+      
+      setAllCollections(collectionsData);
+      
+      // Check events collection
+      const eventsSnapshot = await getDocs(collection(db, 'events'));
+      setEventsCount(eventsSnapshot.size);
+      
+      // Check users collection
+      const usersSnapshot = await getDocs(collection(db, 'users'));
+      setUsersCount(usersSnapshot.size);
+      
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createTestTicket = async () => {
+    try {
+      setLoading(true);
+      
+      const testTicket = {
+        eventId: 'test-event-1',
+        userId: 'test-user-1',
+        inviteCode: `TEST-${Date.now()}`,
+        qrCode: `QR-${Date.now()}`,
+        status: 'active',
+        purchaseDate: Timestamp.fromDate(new Date()),
+        price: 2500, // $25.00 in cents
+        currency: 'USD',
+        eventName: 'Test Event',
+        eventDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // 7 days from now
+        eventLocation: 'Test Location',
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date())
+      };
+      
+      await addDoc(collection(db, 'tickets'), testTicket);
+      await loadData();
+      
+      console.log('Test ticket created successfully in tickets collection');
+      alert('Test ticket created successfully!');
+    } catch (error) {
+      console.error('Error creating test ticket:', error);
+      alert('Error creating test ticket: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createTestTicketInOtherCollection = async (collectionName: string) => {
+    try {
+      setLoading(true);
+      
+      const testTicket = {
+        eventId: 'test-event-1',
+        userId: 'test-user-1',
+        inviteCode: `TEST-${Date.now()}`,
+        qrCode: `QR-${Date.now()}`,
+        status: 'active',
+        purchaseDate: Timestamp.fromDate(new Date()),
+        price: 2500,
+        currency: 'USD',
+        eventName: 'Test Event',
+        eventDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+        eventLocation: 'Test Location',
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date())
+      };
+      
+      await addDoc(collection(db, collectionName), testTicket);
+      await loadData();
+      
+      console.log(`Test ticket created successfully in ${collectionName} collection`);
+      alert(`Test ticket created successfully in ${collectionName} collection!`);
+    } catch (error) {
+      console.error(`Error creating test ticket in ${collectionName}:`, error);
+      alert(`Error creating test ticket in ${collectionName}: ` + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createTestEvent = async () => {
+    try {
+      setLoading(true);
+      
+      const testEvent = {
+        name: 'Test Event',
+        price: '25.00',
+        description: 'This is a test event for debugging',
+        imageURL: 'https://via.placeholder.com/300x200',
+        rating: 4.5,
+        startLocation: {
+          latitude: 40.7128,
+          longitude: -74.0060
+        },
+        startTime: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
+        country: 'USA',
+        includedDescription: 'Test event includes everything',
+        startLocationName: 'New York, NY',
+        status: 'active',
+        createdAt: Timestamp.fromDate(new Date()),
+        updatedAt: Timestamp.fromDate(new Date())
+      };
+      
+      await addDoc(collection(db, 'events'), testEvent);
+      await loadData();
+      
+      console.log('Test event created successfully');
+    } catch (error) {
+      console.error('Error creating test event:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkUserTickets = async () => {
+    if (!userId.trim()) return;
+    
+    try {
+      setUserTicketsLoading(true);
+      
+      const q = query(collection(db, 'tickets'), where('userId', '==', userId.trim()));
+      const snapshot = await getDocs(q);
+      
+      const tickets = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      setUserTickets(tickets);
+      console.log(`Found ${tickets.length} tickets for user ${userId}`);
+    } catch (error) {
+      console.error('Error checking user tickets:', error);
+    } finally {
+      setUserTicketsLoading(false);
+    }
+  };
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Firebase Debug</h1>
-            <p className="text-muted-foreground">
-              Scan Firebase collections to find user data
-            </p>
-          </div>
-          <Button
-            onClick={scanCollections}
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Scanning...' : 'Rescan Collections'}
-          </Button>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-2 text-red-600">
-                <AlertCircle className="h-4 w-4" />
-                <span>{error}</span>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Collections Overview */}
+    <AdminLayout title="Firebase Debug" subtitle="Check Firebase collections and create test data">
+      <div className="max-w-4xl mx-auto space-y-6">
+        
+        {/* Collection Status */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Firebase Collections
-            </CardTitle>
-            <CardDescription>
-              Found {collections.length} collections with data
-            </CardDescription>
+            <CardTitle>Firebase Collections Status</CardTitle>
           </CardHeader>
           <CardContent>
-            {collections.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No collections found. Click "Rescan Collections" to scan Firebase.
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h3 className="font-semibold text-blue-800">Tickets</h3>
+                <p className="text-2xl font-bold text-blue-600">{ticketsCount}</p>
+                <p className="text-sm text-blue-600">documents</p>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {collections.map((collection) => (
-                  <Card key={collection.name} className="relative">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{collection.name}</CardTitle>
-                        <div className="flex items-center gap-2">
-                          {collection.hasUserData && (
-                            <Badge variant="secondary" className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              Users
-                            </Badge>
-                          )}
-                          <Badge variant="outline">
-                            {collection.count} docs
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">
-                          Sample documents:
-                        </p>
-                        {collection.sampleDocs.map((doc, index) => (
-                          <div key={doc.id} className="text-xs bg-gray-50 p-2 rounded">
-                            <div className="font-mono text-gray-600">ID: {doc.id}</div>
-                            <div className="mt-1">
-                              {Object.keys(doc.data).slice(0, 3).map(key => (
-                                <div key={key} className="text-gray-500">
-                                  {key}: {typeof doc.data[key] === 'object' ? 
-                                    JSON.stringify(doc.data[key]).slice(0, 30) + '...' : 
-                                    String(doc.data[key]).slice(0, 30)
-                                  }
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              
+              <div className="p-4 bg-green-50 rounded-lg">
+                <h3 className="font-semibold text-green-800">Events</h3>
+                <p className="text-2xl font-bold text-green-600">{eventsCount}</p>
+                <p className="text-sm text-green-600">documents</p>
               </div>
-            )}
+              
+              <div className="p-4 bg-purple-50 rounded-lg">
+                <h3 className="font-semibold text-purple-800">Users</h3>
+                <p className="text-2xl font-bold text-purple-600">{usersCount}</p>
+                <p className="text-sm text-purple-600">documents</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* User Data Summary */}
-        {collections.some(c => c.hasUserData) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                User Data Found
-              </CardTitle>
-              <CardDescription>
-                Collections that contain user information
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {collections
-                  .filter(c => c.hasUserData)
-                  .map(collection => (
-                    <div key={collection.name} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                        <div>
-                          <div className="font-medium">{collection.name}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {collection.count} documents
+        {/* Test Data Creation */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Create Test Data</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <Button 
+                  onClick={createTestEvent}
+                  disabled={loading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  Create Test Event
+                </Button>
+                <Button 
+                  onClick={createTestTicket}
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Create Test Ticket
+                </Button>
+                <Button 
+                  onClick={loadData}
+                  disabled={loading}
+                  variant="outline"
+                >
+                  Refresh Data
+                </Button>
+              </div>
+              
+              {loading && (
+                <div className="flex items-center space-x-2 text-gray-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span>Loading...</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* All Collections */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Firebase Collections</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {allCollections.map((collection, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <p className="font-medium">{collection.name}</p>
+                    {collection.sample && (
+                      <p className="text-xs text-gray-500">
+                        Sample: {JSON.stringify(collection.sample, null, 2).substring(0, 100)}...
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-blue-600">{collection.count}</p>
+                      <p className="text-xs text-gray-500">documents</p>
+                    </div>
+                    {(collection.name === 'tickets' || collection.name === 'ticketGroups' || collection.name === 'purchases') && (
+                      <Button
+                        size="sm"
+                        onClick={() => createTestTicketInOtherCollection(collection.name)}
+                        disabled={loading}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Add Test
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* User Tickets Check */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Check User Tickets</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <Input
+                  placeholder="Enter User ID to check tickets..."
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={checkUserTickets}
+                  disabled={userTicketsLoading || !userId.trim()}
+                >
+                  Check Tickets
+                </Button>
+              </div>
+              
+              {userTicketsLoading && (
+                <div className="flex items-center space-x-2 text-gray-600">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  <span>Checking tickets...</span>
+                </div>
+              )}
+              
+              {userTickets.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="font-semibold mb-2">Found {userTickets.length} tickets:</h4>
+                  <div className="space-y-2">
+                    {userTickets.map((ticket, index) => (
+                      <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">Invite Code: {ticket.inviteCode}</p>
+                            <p className="text-sm text-gray-600">Event: {ticket.eventName || 'Unknown'}</p>
+                            <p className="text-sm text-gray-600">Status: {ticket.status}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-gray-600">Price: ${(ticket.price / 100).toFixed(2)}</p>
+                            <p className="text-xs text-gray-500">
+                              {ticket.purchaseDate?.toDate?.()?.toLocaleDateString() || 'No date'}
+                            </p>
                           </div>
                         </div>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          // This would trigger sync for this specific collection
-                          console.log(`Sync users from ${collection.name}`)
-                        }}
-                      >
-                        Sync Users
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {userTickets.length === 0 && userId && !userTicketsLoading && (
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-yellow-800">No tickets found for user ID: {userId}</p>
+                  <p className="text-yellow-600 text-sm mt-1">
+                    This might explain why tickets don't show in mobile app
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Instructions */}
+        {/* Troubleshooting Info */}
         <Card>
           <CardHeader>
-            <CardTitle>Next Steps</CardTitle>
+            <CardTitle>Troubleshooting Mobile App Tickets</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>1. <strong>Check the collections above</strong> - look for collections with user data</p>
-            <p>2. <strong>Click "Sync Users"</strong> on collections that contain user information</p>
-            <p>3. <strong>Go back to Users page</strong> to see the synced users</p>
-            <p>4. <strong>If no user data found</strong>, check your mobile app's Firebase structure</p>
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <p className="text-blue-800 font-medium">💡 Tip: Check Firebase Console</p>
-              <p className="text-blue-700 text-xs mt-1">
-                Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener noreferrer" className="underline">Firebase Console</a> → 
-                Your Project → Firestore Database → Data tab to see all collections
-              </p>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">Possible Issues:</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>Mobile app might be looking for tickets in a different collection</li>
+                  <li>User authentication mismatch between admin panel and mobile app</li>
+                  <li>Mobile app might be filtering tickets by user ID</li>
+                  <li>Different Firebase project configuration</li>
+                  <li>Mobile app might be using different field names</li>
+                </ul>
+              </div>
+              
+              <div>
+                <h4 className="font-semibold text-gray-800 mb-2">Solutions:</h4>
+                <ul className="list-disc list-inside space-y-1 text-gray-600">
+                  <li>Check mobile app Firebase configuration</li>
+                  <li>Verify user ID matches between admin and mobile app</li>
+                  <li>Check mobile app ticket query filters</li>
+                  <li>Ensure mobile app has proper Firestore permissions</li>
+                  <li>Check mobile app console for error messages</li>
+                </ul>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
     </AdminLayout>
-  )
+  );
 }

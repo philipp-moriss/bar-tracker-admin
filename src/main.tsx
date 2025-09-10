@@ -9,6 +9,7 @@ import { router } from '@/core/routing/routes'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { TooltipProvider } from '@/core/components/ui/tooltip';
 import { ThemeProvider } from './core/feauture/theme/theme-provider'
+import { Toaster } from '@/core/components/ui/toast/sonner'
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -28,6 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
                 <I18nextProvider i18n={i18n}>
                     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
                         <RouterProvider router={router} />
+                        <Toaster />
                     </ThemeProvider>
                 </I18nextProvider>
             </QueryClientProvider>

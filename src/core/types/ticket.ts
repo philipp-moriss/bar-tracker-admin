@@ -6,13 +6,15 @@ export interface Ticket {
   eventId: string
   userId: string
   inviteCode: string
-  qrCode: string
+  qrCode?: string
   status: TicketStatus
   purchaseDate: Timestamp | Date
   usedDate?: Timestamp | Date
   price: number
   currency: string
   paymentIntentId?: string
+  paymentId?: string // Из ticketGroups
+  mainTicketId?: string // Из ticketGroups
   groupName?: string
   eventName?: string
   eventDate?: Timestamp | Date
@@ -54,6 +56,7 @@ export interface Purchase {
 export enum TicketStatus {
   ACTIVE = 'active',
   USED = 'used',
+  SCANNED = 'scanned',
   CANCELLED = 'cancelled',
   EXPIRED = 'expired'
 }

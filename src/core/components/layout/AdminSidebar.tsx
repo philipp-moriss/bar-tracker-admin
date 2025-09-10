@@ -1,7 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
-  Home, 
   Calendar, 
   QrCode, 
   Users, 
@@ -21,14 +20,8 @@ interface AdminSidebarProps {
 
 const navigationItems = [
   {
-    name: 'Dashboard',
-    href: '/admin',
-    icon: Home,
-    description: 'Overview and quick actions'
-  },
-  {
     name: 'Events',
-    href: '/admin/events',
+    href: '/admin',
     icon: Calendar,
     description: 'Manage events and tours'
   },

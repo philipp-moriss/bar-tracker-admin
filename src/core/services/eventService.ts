@@ -8,21 +8,19 @@ import {
   deleteDoc, 
   query, 
   where, 
-  orderBy,
   Timestamp 
 } from 'firebase/firestore'
 import { db } from '@/modules/firebase/config'
 import { Event, CreateEventData, UpdateEventData, EventFilters, EventStats, EventStatus } from '@/core/types/event'
 
-export class EventService {
-  private readonly eventsCollection = collection(db, 'events')
+const eventsCollection = collection(db, 'events')
 
   /**
    * Get all events with optional filters
    */
-  async getEvents(filters?: EventFilters): Promise<Event[]> {
+  async function getEvents(filters?: EventFilters): Promise<Event[]> {
     try {
-      let q = query(this.eventsCollection, orderBy('startTime', 'desc'))
+      let q = query(eventsCollection)
 
       if (filters?.status) {
         q = query(q, where('status', '==', filters.status))
@@ -52,11 +50,33 @@ export class EventService {
       // Client-side filtering for search
       if (filters?.search) {
         const searchLower = filters.search.toLowerCase()
-        events = events.filter(event => 
-          event.name.toLowerCase().includes(searchLower) ||
-          event.description.toLowerCase().includes(searchLower) ||
-          event.startLocationName.toLowerCase().includes(searchLower)
-        )
+        events = events.filter(event => {
+          const name = (event.name || '').toLowerCase()
+          const description = (event.description || '').toLowerCase()
+          const locationName = (event.startLocationName || '').toLowerCase()
+          return (
+            name.includes(searchLower) ||
+            description.includes(searchLower) ||
+            locationName.includes(searchLower)
+          )
+        })
+      }
+
+      // Client-side sorting (избегаем композитных индексов в Firestore)
+      if (filters?.sortBy) {
+        const dir = filters.sortDir === 'asc' ? 1 : -1
+        const field = filters.sortBy
+        events.sort((a: any, b: any) => {
+          const av = a[field]
+          const bv = b[field]
+          if (av == null && bv == null) return 0
+          if (av == null) return 1
+          if (bv == null) return -1
+          if (typeof av === 'string' && typeof bv === 'string') {
+            return av.localeCompare(bv) * dir
+          }
+          return (av > bv ? 1 : av < bv ? -1 : 0) * dir
+        })
       }
 
       return events
@@ -69,9 +89,9 @@ export class EventService {
   /**
    * Get single event by ID
    */
-  async getEventById(id: string): Promise<Event | null> {
+  async function getEventById(id: string): Promise<Event | null> {
     try {
-      const docRef = doc(this.eventsCollection, id)
+      const docRef = doc(eventsCollection, id)
       const docSnap = await getDoc(docRef)
 
       if (docSnap.exists()) {
@@ -95,7 +115,7 @@ export class EventService {
   /**
    * Create new event
    */
-  async createEvent(eventData: CreateEventData): Promise<Event> {
+  async function createEvent(eventData: CreateEventData): Promise<Event> {
     try {
       const now = new Date()
       const eventToCreate = {
@@ -107,7 +127,7 @@ export class EventService {
         updatedAt: Timestamp.fromDate(now),
       }
 
-      const docRef = await addDoc(this.eventsCollection, eventToCreate)
+      const docRef = await addDoc(eventsCollection, eventToCreate)
       
       return {
         id: docRef.id,
@@ -126,10 +146,10 @@ export class EventService {
   /**
    * Update existing event
    */
-  async updateEvent(eventData: UpdateEventData): Promise<void> {
+  async function updateEvent(eventData: UpdateEventData): Promise<void> {
     try {
       const { id, ...updateData } = eventData
-      const docRef = doc(this.eventsCollection, id)
+      const docRef = doc(eventsCollection, id)
 
       const updatePayload: any = {
         ...updateData,
@@ -151,9 +171,9 @@ export class EventService {
   /**
    * Delete event
    */
-  async deleteEvent(id: string): Promise<void> {
+  async function deleteEvent(id: string): Promise<void> {
     try {
-      const docRef = doc(this.eventsCollection, id)
+      const docRef = doc(eventsCollection, id)
       await deleteDoc(docRef)
     } catch (error) {
       console.error('Error deleting event:', error)
@@ -164,9 +184,9 @@ export class EventService {
   /**
    * Update event status
    */
-  async updateEventStatus(id: string, status: EventStatus): Promise<void> {
+  async function updateEventStatus(id: string, status: EventStatus): Promise<void> {
     try {
-      const docRef = doc(this.eventsCollection, id)
+      const docRef = doc(eventsCollection, id)
       await updateDoc(docRef, {
         status,
         updatedAt: Timestamp.fromDate(new Date()),
@@ -180,9 +200,9 @@ export class EventService {
   /**
    * Get event statistics
    */
-  async getEventStats(): Promise<EventStats> {
+  async function getEventStats(): Promise<EventStats> {
     try {
-      const events = await this.getEvents()
+      const events = await getEvents()
       
       const stats: EventStats = {
         totalEvents: events.length,
@@ -201,7 +221,13 @@ export class EventService {
       throw new Error('Failed to fetch event statistics')
     }
   }
-}
 
-// Export singleton instance
-export const eventService = new EventService()
+export const eventService = {
+  getEvents,
+  getEventById,
+  createEvent,
+  updateEvent,
+  deleteEvent,
+  updateEventStatus,
+  getEventStats,
+} as const

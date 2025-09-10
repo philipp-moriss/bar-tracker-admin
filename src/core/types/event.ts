@@ -54,6 +54,8 @@ export interface EventFilters {
   dateFrom?: Date
   dateTo?: Date
   search?: string
+  sortBy?: 'startTime' | 'name' | 'price' | 'status' | 'createdAt' | 'startLocationName'
+  sortDir?: 'asc' | 'desc'
 }
 
 // Event statistics

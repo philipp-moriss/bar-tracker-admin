@@ -1,7 +1,6 @@
 import { HomePage } from "@/pages/home";
 import { LoginPage } from "@/pages/login";
 import { AdminSetupPage } from "@/pages/admin-setup";
-import { AdminDashboard } from "@/pages/admin-dashboard";
 import { AdminEventsPage } from "@/pages/admin-events";
 import { CreateEventPage } from "@/pages/admin-events/create";
 import { AdminTicketsPage } from "@/pages/admin-tickets";
@@ -9,6 +8,7 @@ import { TicketDetailsPage } from "@/pages/admin-tickets/details";
 import { AdminUsersPage } from "@/pages/admin-users";
 import { UserProfilePage } from "@/pages/admin-users/profile";
 import CreateUserPage from "@/pages/admin-users/create";
+import { AdminAnalyticsPage } from "@/pages/admin-analytics";
 import AdminDebugPage from "@/pages/admin-debug";
 import { ProtectedRoute } from "@/core/routing/ProtectedRoute";
 import { createBrowserRouter } from "react-router-dom";
@@ -37,7 +37,7 @@ export const router = createBrowserRouter([
                   path: "",
                   element: (
                     <ProtectedRoute>
-                      <AdminDashboard />
+                      <AdminEventsPage />
                     </ProtectedRoute>
                   ),
                 },
@@ -94,6 +94,14 @@ export const router = createBrowserRouter([
                   element: (
                     <ProtectedRoute>
                       <UserProfilePage />
+                    </ProtectedRoute>
+                  ),
+                },
+                {
+                  path: "analytics",
+                  element: (
+                    <ProtectedRoute>
+                      <AdminAnalyticsPage />
                     </ProtectedRoute>
                   ),
                 },

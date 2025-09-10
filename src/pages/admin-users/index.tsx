@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Eye, Shield, UserCheck, UserX, Crown, User, Users, Mail, Phone, Calendar, DollarSign, UserPlus, RefreshCw } from 'lucide-react';
+import { Search, Eye, Shield, UserCheck, UserX, Crown, User, Users, Mail, Phone, Calendar, DollarSign, UserPlus } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 
 import { Button } from '@/core/components/ui/button';
@@ -23,6 +23,9 @@ import { Badge } from '@/core/components/ui/badge';
 import { userService } from '@/core/services/userService';
 import { User as UserType, UserRole, UserStatus, UserFilters } from '@/core/types/user';
 import { AnalyticsService } from '@/core/services/analyticsService';
+import { toast } from 'sonner';
+import { ConfirmModal } from '@/core/components/ui/modals/ConfirmModal';
+import { UserViewModal } from '@/core/components/ui/modals/UserViewModal';
 
 export const AdminUsersPage = () => {
   const navigate = useNavigate();
@@ -32,7 +35,15 @@ export const AdminUsersPage = () => {
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Modal states
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [unblockModalOpen, setUnblockModalOpen] = useState(false);
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; role?: UserRole } | null>(null);
+  const [viewUser, setViewUser] = useState<UserType | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Load users on component mount
   useEffect(() => {
@@ -70,73 +81,87 @@ export const AdminUsersPage = () => {
     return () => clearTimeout(timeoutId);
   }, [searchTerm, roleFilter, statusFilter]);
 
-  const handleViewUser = (userId: string) => {
-    navigate(`/admin/users/${userId}`);
+  const handleViewUser = (user: UserType) => {
+    setViewUser(user);
+    setViewModalOpen(true);
   };
 
-  const handleBlockUser = async (userId: string, userName: string) => {
-    if (window.confirm(`Block user "${userName}"?`)) {
-      try {
-        await userService.blockUser(userId, 'Blocked by administrator');
-        await loadUsers();
-        AnalyticsService.logCustomEvent('user_blocked', { userId });
-      } catch (err) {
-        setError('Failed to block user');
-        console.error('Error blocking user:', err);
-      }
-    }
+  const handleBlockUser = (userId: string, userName: string) => {
+    setSelectedUser({ id: userId, name: userName });
+    setBlockModalOpen(true);
   };
 
-  const handleUnblockUser = async (userId: string, userName: string) => {
-    if (window.confirm(`Unblock user "${userName}"?`)) {
-      try {
-        await userService.unblockUser(userId);
-        await loadUsers();
-        AnalyticsService.logCustomEvent('user_unblocked', { userId });
-      } catch (err) {
-        setError('Failed to unblock user');
-        console.error('Error unblocking user:', err);
-      }
-    }
-  };
-
-  const handleChangeRole = async (userId: string, newRole: UserRole, userName: string) => {
-    if (window.confirm(`Change role of "${userName}" to ${newRole}?`)) {
-      try {
-        await userService.changeUserRole(userId, newRole);
-        await loadUsers();
-        AnalyticsService.logCustomEvent('user_role_changed', { userId, newRole });
-      } catch (err) {
-        setError('Failed to change user role');
-        console.error('Error changing user role:', err);
-      }
-    }
-  };
-
-  const handleSyncUsers = async () => {
-    setIsSyncing(true);
-    setError(null);
+  const confirmBlockUser = async () => {
+    if (!selectedUser) return;
     
     try {
-      const result = await userService.syncUsersFromOtherCollections();
-      
-      if (result.synced > 0) {
-        await loadUsers(); // Reload users after sync
-        alert(`Successfully synced ${result.synced} users from other collections!`);
-        AnalyticsService.logCustomEvent('users_synced', { synced: result.synced });
-      } else if (result.errors.length > 0) {
-        setError(`Sync completed with ${result.errors.length} errors. Check console for details.`);
-        console.warn('Sync errors:', result.errors);
-      } else {
-        alert('No users found in other collections to sync.');
-      }
+      setActionLoading(true);
+      await userService.blockUser(selectedUser.id, 'Blocked by administrator');
+      await loadUsers();
+      toast.success(`User "${selectedUser.name}" has been blocked`);
+      AnalyticsService.logCustomEvent('user_blocked', { userId: selectedUser.id });
     } catch (err) {
-      setError('Failed to sync users');
-      console.error('Error syncing users:', err);
+      toast.error('Failed to block user');
+      setError('Failed to block user');
+      console.error('Error blocking user:', err);
     } finally {
-      setIsSyncing(false);
+      setActionLoading(false);
+      setBlockModalOpen(false);
+      setSelectedUser(null);
     }
   };
+
+  const handleUnblockUser = (userId: string, userName: string) => {
+    setSelectedUser({ id: userId, name: userName });
+    setUnblockModalOpen(true);
+  };
+
+  const confirmUnblockUser = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      setActionLoading(true);
+      await userService.unblockUser(selectedUser.id);
+      await loadUsers();
+      toast.success(`User "${selectedUser.name}" has been unblocked`);
+      AnalyticsService.logCustomEvent('user_unblocked', { userId: selectedUser.id });
+    } catch (err) {
+      toast.error('Failed to unblock user');
+      setError('Failed to unblock user');
+      console.error('Error unblocking user:', err);
+    } finally {
+      setActionLoading(false);
+      setUnblockModalOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+  const handleChangeRole = (userId: string, newRole: UserRole, userName: string) => {
+    setSelectedUser({ id: userId, name: userName, role: newRole });
+    setRoleModalOpen(true);
+  };
+
+  const confirmChangeRole = async () => {
+    if (!selectedUser || !selectedUser.role) return;
+    
+    try {
+      setActionLoading(true);
+      await userService.changeUserRole(selectedUser.id, selectedUser.role);
+      await loadUsers();
+      toast.success(`User "${selectedUser.name}" role changed to ${selectedUser.role}`);
+      AnalyticsService.logCustomEvent('user_role_changed', { userId: selectedUser.id, newRole: selectedUser.role });
+    } catch (err) {
+      toast.error('Failed to change user role');
+      setError('Failed to change user role');
+      console.error('Error changing user role:', err);
+    } finally {
+      setActionLoading(false);
+      setRoleModalOpen(false);
+      setSelectedUser(null);
+    }
+  };
+
+
 
   const getRoleBadge = (role: UserRole) => {
     const roleConfig = {
@@ -145,7 +170,11 @@ export const AdminUsersPage = () => {
       [UserRole.ADMIN]: { label: 'Admin', variant: 'destructive' as const, icon: Crown },
     };
 
-    const config = roleConfig[role];
+    const config = roleConfig[role] || { 
+      label: `Unknown (${role})`, 
+      variant: 'outline' as const, 
+      icon: User 
+    };
     const Icon = config.icon;
     
     return (
@@ -170,9 +199,14 @@ export const AdminUsersPage = () => {
       [UserStatus.ACTIVE]: { label: 'Active', variant: 'default' as const, icon: UserCheck },
       [UserStatus.INACTIVE]: { label: 'Inactive', variant: 'secondary' as const, icon: User },
       [UserStatus.PENDING]: { label: 'Pending', variant: 'outline' as const, icon: User },
+      [UserStatus.BLOCKED]: { label: 'Blocked', variant: 'destructive' as const, icon: UserX },
     };
 
-    const config = statusConfig[status];
+    const config = statusConfig[status] || { 
+      label: `Unknown (${status})`, 
+      variant: 'outline' as const, 
+      icon: User 
+    };
     const Icon = config.icon;
     
     return (
@@ -272,15 +306,6 @@ export const AdminUsersPage = () => {
               </CardTitle>
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={handleSyncUsers}
-                  disabled={isSyncing}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  {isSyncing ? 'Syncing...' : 'Sync Users'}
-                </Button>
-                <Button
                   onClick={() => navigate('/admin/users/create')}
                   className="flex items-center gap-2"
                 >
@@ -375,13 +400,14 @@ export const AdminUsersPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleViewUser(user.id)}
+                              onClick={() => handleViewUser(user)}
+                              title="View User Details"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             
                             {/* Role Change Buttons */}
-                            {user.role !== UserRole.ADMIN && (
+                            {user.role === UserRole.USER && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -390,6 +416,17 @@ export const AdminUsersPage = () => {
                                 title="Make Bartender"
                               >
                                 <Shield className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {user.role === UserRole.BARTENDER && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleChangeRole(user.id, UserRole.USER, user.name)}
+                                className="text-gray-700 hover:text-gray-800"
+                                title="Make User"
+                              >
+                                <User className="h-4 w-4" />
                               </Button>
                             )}
                             
@@ -426,6 +463,46 @@ export const AdminUsersPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modals */}
+      <ConfirmModal
+        open={blockModalOpen}
+        onOpenChange={setBlockModalOpen}
+        onConfirm={confirmBlockUser}
+        loading={actionLoading}
+        title="Block User"
+        description={`Are you sure you want to block "${selectedUser?.name}"?`}
+        confirmText="Block"
+        variant="destructive"
+      />
+
+      <ConfirmModal
+        open={unblockModalOpen}
+        onOpenChange={setUnblockModalOpen}
+        onConfirm={confirmUnblockUser}
+        loading={actionLoading}
+        title="Unblock User"
+        description={`Are you sure you want to unblock "${selectedUser?.name}"?`}
+        confirmText="Unblock"
+        variant="default"
+      />
+
+      <ConfirmModal
+        open={roleModalOpen}
+        onOpenChange={setRoleModalOpen}
+        onConfirm={confirmChangeRole}
+        loading={actionLoading}
+        title="Change User Role"
+        description={`Are you sure you want to change "${selectedUser?.name}" role to ${selectedUser?.role}?`}
+        confirmText="Change Role"
+        variant="default"
+      />
+
+      <UserViewModal
+        open={viewModalOpen}
+        onOpenChange={setViewModalOpen}
+        user={viewUser}
+      />
     </AdminLayout>
   );
 };

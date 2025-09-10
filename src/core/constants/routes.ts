@@ -2,9 +2,8 @@ export const ROUTES = {
     ADMIN: {
         LOGIN: '/admin/login',
         SETUP: '/admin/setup',
-        DASHBOARD: '/admin',
         EVENTS: {
-            LIST: '/admin/events',
+            LIST: '/admin',
             CREATE: '/admin/events/create',
             DETAILS: (id: string) => `/admin/events/${id}`,
             EDIT: (id: string) => `/admin/events/${id}/edit`,
@@ -66,7 +65,8 @@ export const ROUTES = {
             CREATE: '/admin/interviewer-pages/create',
             EDIT: (id: string) => `/admin/interviewer-pages/${id}/edit`,
             DETAILS: (id: string) => `/admin/interviewer-pages/${id}`
-        }
+        },
+        ANALYTICS: '/admin/analytics'
     },
     FORMS: {
         PREVIEW: (formId: string) => `/forms/${formId}`,
