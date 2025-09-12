@@ -1,11 +1,12 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { 
-  Calendar, 
-  QrCode, 
-  Users, 
-  BarChart3, 
-  Settings, 
+import {
+  Calendar,
+  QrCode,
+  Users,
+  Building2,
+  BarChart3,
+  Settings,
   Menu,
   X,
   Bug
@@ -36,6 +37,12 @@ const navigationItems = [
     href: '/admin/users',
     icon: Users,
     description: 'User management'
+  },
+  {
+    name: 'Bars',
+    href: '/admin/bars',
+    icon: Building2,
+    description: 'Manage bars and venues'
   },
   {
     name: 'Analytics',
@@ -73,7 +80,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle }) 
     <>
       {/* Mobile overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={onToggle}
         />
@@ -113,7 +120,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ isOpen, onToggle }) 
             {navigationItems.map((item) => {
               const isActive = location.pathname === item.href;
               const Icon = item.icon;
-              
+
               return (
                 <li key={item.name}>
                   <button

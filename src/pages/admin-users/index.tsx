@@ -21,6 +21,7 @@ import {
 } from '@/core/components/ui/table';
 import { Badge } from '@/core/components/ui/badge';
 import { userService } from '@/core/services/userService';
+import { barService } from '@/core/services/barService';
 import { User as UserType, UserRole, UserStatus, UserFilters } from '@/core/types/user';
 import { AnalyticsService } from '@/core/services/analyticsService';
 import { toast } from 'sonner';
@@ -35,15 +36,18 @@ export const AdminUsersPage = () => {
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
-  
+
   // Modal states
   const [blockModalOpen, setBlockModalOpen] = useState(false);
   const [unblockModalOpen, setUnblockModalOpen] = useState(false);
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [assignBarModalOpen, setAssignBarModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; role?: UserRole } | null>(null);
   const [viewUser, setViewUser] = useState<UserType | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [availableBars, setAvailableBars] = useState<string[]>([]);
+  const [selectedBar, setSelectedBar] = useState<string>('');
 
   // Load users on component mount
   useEffect(() => {
@@ -55,7 +59,7 @@ export const AdminUsersPage = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const filters: UserFilters = {
         search: searchTerm || undefined,
         role: roleFilter || undefined,
@@ -86,6 +90,21 @@ export const AdminUsersPage = () => {
     setViewModalOpen(true);
   };
 
+  const handleAssignBar = async (user: UserType) => {
+    try {
+      // Get available bars from bars collection
+      const bars = await barService.getBars({ isActive: true });
+      const barNames = bars.map(bar => bar.name);
+      setAvailableBars(barNames);
+      setSelectedUser({ id: user.id, name: user.name });
+      setSelectedBar(user.barName || '');
+      setAssignBarModalOpen(true);
+    } catch (error) {
+      console.error('Error loading bars:', error);
+      toast.error('Failed to load available bars');
+    }
+  };
+
   const handleBlockUser = (userId: string, userName: string) => {
     setSelectedUser({ id: userId, name: userName });
     setBlockModalOpen(true);
@@ -93,7 +112,7 @@ export const AdminUsersPage = () => {
 
   const confirmBlockUser = async () => {
     if (!selectedUser) return;
-    
+
     try {
       setActionLoading(true);
       await userService.blockUser(selectedUser.id, 'Blocked by administrator');
@@ -118,7 +137,7 @@ export const AdminUsersPage = () => {
 
   const confirmUnblockUser = async () => {
     if (!selectedUser) return;
-    
+
     try {
       setActionLoading(true);
       await userService.unblockUser(selectedUser.id);
@@ -143,7 +162,7 @@ export const AdminUsersPage = () => {
 
   const confirmChangeRole = async () => {
     if (!selectedUser || !selectedUser.role) return;
-    
+
     try {
       setActionLoading(true);
       await userService.changeUserRole(selectedUser.id, selectedUser.role);
@@ -161,7 +180,32 @@ export const AdminUsersPage = () => {
     }
   };
 
+  const confirmAssignBar = async () => {
+    if (!selectedUser) return;
 
+    try {
+      setActionLoading(true);
+
+      // Prepare update data - only include barName if it's not empty
+      const updateData: any = {};
+      if (selectedBar && selectedBar.trim() !== '') {
+        updateData.barName = selectedBar.trim();
+      }
+
+      await userService.updateUser(selectedUser.id, updateData);
+
+      toast.success(`Bar assigned: ${selectedBar || 'None'}`);
+      setAssignBarModalOpen(false);
+      setSelectedUser(null);
+      setSelectedBar('');
+      loadUsers();
+    } catch (error) {
+      console.error('Error assigning bar:', error);
+      toast.error('Failed to assign bar');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const getRoleBadge = (role: UserRole) => {
     const roleConfig = {
@@ -170,13 +214,13 @@ export const AdminUsersPage = () => {
       [UserRole.ADMIN]: { label: 'Admin', variant: 'destructive' as const, icon: Crown },
     };
 
-    const config = roleConfig[role] || { 
-      label: `Unknown (${role})`, 
-      variant: 'outline' as const, 
-      icon: User 
+    const config = roleConfig[role] || {
+      label: `Unknown (${role})`,
+      variant: 'outline' as const,
+      icon: User
     };
     const Icon = config.icon;
-    
+
     return (
       <Badge variant={config.variant} className="flex items-center space-x-1">
         <Icon className="h-3 w-3" />
@@ -202,13 +246,13 @@ export const AdminUsersPage = () => {
       [UserStatus.BLOCKED]: { label: 'Blocked', variant: 'destructive' as const, icon: UserX },
     };
 
-    const config = statusConfig[status] || { 
-      label: `Unknown (${status})`, 
-      variant: 'outline' as const, 
-      icon: User 
+    const config = statusConfig[status] || {
+      label: `Unknown (${status})`,
+      variant: 'outline' as const,
+      icon: User
     };
     const Icon = config.icon;
-    
+
     return (
       <Badge variant={config.variant} className="flex items-center space-x-1">
         <Icon className="h-3 w-3" />
@@ -333,6 +377,7 @@ export const AdminUsersPage = () => {
                       <TableHead>User</TableHead>
                       <TableHead>Contact</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>Bar</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead>Activity</TableHead>
@@ -375,6 +420,21 @@ export const AdminUsersPage = () => {
                           {getRoleBadge(user.role)}
                         </TableCell>
                         <TableCell>
+                          {user.role === 'bartender' ? (
+                            user.barName ? (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                {user.barName}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                No bar assigned
+                              </Badge>
+                            )
+                          ) : (
+                            <span className="text-barTrekker-darkGrey/50">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           {getStatusBadge(user.status, user.isBlocked || false)}
                         </TableCell>
                         <TableCell>
@@ -405,7 +465,7 @@ export const AdminUsersPage = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                            
+
                             {/* Role Change Buttons */}
                             {user.role === UserRole.USER && (
                               <Button
@@ -419,17 +479,28 @@ export const AdminUsersPage = () => {
                               </Button>
                             )}
                             {user.role === UserRole.BARTENDER && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleChangeRole(user.id, UserRole.USER, user.name)}
-                                className="text-gray-700 hover:text-gray-800"
-                                title="Make User"
-                              >
-                                <User className="h-4 w-4" />
-                              </Button>
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleAssignBar(user)}
+                                  className="text-green-600 hover:text-green-700"
+                                  title="Assign Bar"
+                                >
+                                  <Crown className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleChangeRole(user.id, UserRole.USER, user.name)}
+                                  className="text-gray-700 hover:text-gray-800"
+                                  title="Make User"
+                                >
+                                  <User className="h-4 w-4" />
+                                </Button>
+                              </>
                             )}
-                            
+
                             {/* Block/Unblock Buttons */}
                             {user.isBlocked ? (
                               <Button
@@ -503,6 +574,61 @@ export const AdminUsersPage = () => {
         onOpenChange={setViewModalOpen}
         user={viewUser}
       />
+
+      {/* Assign Bar Modal */}
+      <ConfirmModal
+        open={assignBarModalOpen}
+        onOpenChange={setAssignBarModalOpen}
+        onConfirm={confirmAssignBar}
+        loading={actionLoading}
+        title="Assign Bar to Bartender"
+        description={`Assign a bar to "${selectedUser?.name}"`}
+        confirmText="Assign Bar"
+        variant="default"
+      />
+
+      {/* Bar Selection Modal */}
+      {assignBarModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Assign Bar to Bartender</h3>
+            <p className="text-sm text-gray-600 mb-4">Assign a bar to "{selectedUser?.name}":</p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Select Bar:</label>
+                <select
+                  value={selectedBar}
+                  onChange={(e) => setSelectedBar(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-barTrekker-orange focus:border-barTrekker-orange"
+                >
+                  <option value="">No bar assigned</option>
+                  {availableBars.map((bar) => (
+                    <option key={bar} value={bar}>
+                      {bar}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setAssignBarModalOpen(false)}
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={confirmAssignBar}
+                  disabled={actionLoading}
+                  className="bg-barTrekker-orange hover:bg-barTrekker-orange/90"
+                >
+                  {actionLoading ? 'Assigning...' : 'Assign Bar'}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };

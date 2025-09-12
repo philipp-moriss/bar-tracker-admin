@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ArrowLeft, Save, Calendar, MapPin, DollarSign, Image as ImageIcon } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
+import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
+import { ImageUploadResult } from '@/core/services/imageService';
+import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
 
 import { Button } from '@/core/components/ui/button';
 import {
@@ -23,8 +26,11 @@ import {
 } from '@/core/components/ui/form';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Textarea } from '@/core/components/ui/inputs/textarea';
+import { Select } from '@/core/components/ui/inputs/select';
 import { eventService } from '@/core/services/eventService';
+import { barService } from '@/core/services/barService';
 import { CreateEventData } from '@/core/types/event';
+import { Bar } from '@/core/types/bar';
 import { AnalyticsService } from '@/core/services/analyticsService';
 
 // Form validation schema
@@ -39,6 +45,8 @@ const createEventSchema = z.object({
   imageURL: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   latitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid latitude"),
   longitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid longitude"),
+  // Bar selection
+  barId: z.string().min(1, "Please select a bar"),
 });
 
 type CreateEventFormData = z.infer<typeof createEventSchema>;
@@ -47,6 +55,9 @@ export const CreateEventPage = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [bars, setBars] = useState<Bar[]>([]);
+  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
 
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventSchema),
@@ -61,13 +72,34 @@ export const CreateEventPage = () => {
       imageURL: '',
       latitude: '',
       longitude: '',
+      barId: '',
     },
   });
+
+  // Load bars on component mount
+  useEffect(() => {
+    const loadBars = async () => {
+      try {
+        const barsData = await barService.getBars({ isActive: true });
+        setBars(barsData);
+      } catch (error) {
+        console.error('Error loading bars:', error);
+      }
+    };
+    loadBars();
+  }, []);
 
   const onSubmit = async (data: CreateEventFormData) => {
     try {
       setLoading(true);
       setError(null);
+
+      // Find selected bar
+      const bar = bars.find(b => b.id === data.barId);
+      if (!bar) {
+        setError('Selected bar not found');
+        return;
+      }
 
       const eventData: CreateEventData = {
         name: data.name,
@@ -82,14 +114,25 @@ export const CreateEventPage = () => {
           latitude: parseFloat(data.latitude),
           longitude: parseFloat(data.longitude),
         },
+        // Bar information from selected bar
+        barName: bar.name,
+        barAddress: bar.address,
+        barCity: bar.city,
+        barCountry: bar.country,
+        barPhone: bar.phone || undefined,
+        barEmail: bar.email || undefined,
+        barWebsite: bar.website || undefined,
+        // Images
+        images: uploadedImages.map(img => img.url),
       };
 
       await eventService.createEvent(eventData);
-      
-      AnalyticsService.logCustomEvent('event_created', { 
+
+      AnalyticsService.logCustomEvent('event_created', {
         eventName: data.name,
         country: data.country,
-        price: data.price 
+        price: data.price,
+        barName: bar.name
       });
 
       navigate('/admin/events');
@@ -138,6 +181,90 @@ export const CreateEventPage = () => {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                {/* Bar Selection */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Bar Selection</h3>
+
+                  <FormField
+                    control={form.control}
+                    name="barId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                          Select Bar *
+                        </FormLabel>
+                        <FormControl>
+                          <select
+                            {...field}
+                            onChange={(e) => {
+                              field.onChange(e.target.value);
+                              const bar = bars.find(b => b.id === e.target.value);
+                              setSelectedBar(bar || null);
+                            }}
+                            className="w-full p-3 border border-barTrekker-lightGrey rounded-md bg-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange focus:outline-none"
+                          >
+                            <option value="">Select a bar...</option>
+                            {bars.map((bar) => (
+                              <option key={bar.id} value={bar.id}>
+                                {bar.name} - {bar.city}, {bar.country}
+                              </option>
+                            ))}
+                          </select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Selected Bar Info */}
+                  {selectedBar && (
+                    <div className="p-4 bg-gray-50 rounded-lg border">
+                      <h4 className="font-medium text-gray-900 mb-2">Selected Bar Information:</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Name:</span> {selectedBar.name}
+                        </div>
+                        <div>
+                          <span className="font-medium">City:</span> {selectedBar.city}
+                        </div>
+                        <div>
+                          <span className="font-medium">Address:</span> {selectedBar.address}
+                        </div>
+                        <div>
+                          <span className="font-medium">Country:</span> {selectedBar.country}
+                        </div>
+                        {selectedBar.phone && (
+                          <div>
+                            <span className="font-medium">Phone:</span> {selectedBar.phone}
+                          </div>
+                        )}
+                        {selectedBar.email && (
+                          <div>
+                            <span className="font-medium">Email:</span> {selectedBar.email}
+                          </div>
+                        )}
+                        {selectedBar.website && (
+                          <div>
+                            <span className="font-medium">Website:</span> {selectedBar.website}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {bars.length === 0 && (
+                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <p className="text-yellow-800">
+                        No bars available. Please create a bar first in the{' '}
+                        <a href="/admin/bars" className="underline font-medium">
+                          Bars Management
+                        </a>{' '}
+                        section.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
@@ -253,6 +380,17 @@ export const CreateEventPage = () => {
                   />
                 </div>
 
+                {/* Google Maps Importer */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Location Coordinates</h3>
+                  <GoogleMapsImporter
+                    onCoordinatesFound={(latitude, longitude) => {
+                      form.setValue('latitude', latitude.toString())
+                      form.setValue('longitude', longitude.toString())
+                    }}
+                  />
+                </div>
+
                 {/* Coordinates */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
@@ -343,13 +481,24 @@ export const CreateEventPage = () => {
                   )}
                 />
 
+                {/* Image Upload */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Event Images</h3>
+                  <ImageUpload
+                    onImagesChange={setUploadedImages}
+                    maxImages={5}
+                    folder="events"
+                    disabled={loading}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
                   name="imageURL"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                        Image URL
+                        Fallback Image URL (optional)
                       </FormLabel>
                       <FormControl>
                         <div className="relative">

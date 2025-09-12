@@ -1,26 +1,26 @@
-import { 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  addDoc, 
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
   setDoc,
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  Timestamp 
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  Timestamp
 } from 'firebase/firestore'
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth'
 import { db, auth } from '@/modules/firebase/config'
-import { 
-  User, 
-  UserProfile, 
-  UserFilters, 
-  UserStats, 
-  UserActivity, 
-  UserRole, 
-  UserStatus, 
+import {
+  User,
+  UserProfile,
+  UserFilters,
+  UserStats,
+  UserActivity,
+  UserRole,
+  UserStatus,
   UserAction,
   CreateUserData,
   UpdateUserData
@@ -53,7 +53,7 @@ export class UserService {
       // Use the most basic query possible - no orderBy, no where clauses
       const q = query(this.profilesCollection)
       const snapshot = await getDocs(q)
-      
+
       let users = snapshot.docs.map(doc => {
         const data = doc.data()
         return {
@@ -76,7 +76,7 @@ export class UserService {
       // Apply all filters client-side
       if (filters?.search) {
         const searchLower = filters.search.toLowerCase()
-        users = users.filter(user => 
+        users = users.filter(user =>
           user.name.toLowerCase().includes(searchLower) ||
           user.email.toLowerCase().includes(searchLower) ||
           user.phoneNumber?.toLowerCase().includes(searchLower)
@@ -86,11 +86,11 @@ export class UserService {
       if (filters?.role) {
         users = users.filter(user => user.role === filters.role)
       }
-      
+
       if (filters?.status) {
         users = users.filter(user => user.status === filters.status)
       }
-      
+
       if (filters?.isBlocked !== undefined) {
         users = users.filter(user => user.isBlocked === filters.isBlocked)
       }
@@ -114,13 +114,13 @@ export class UserService {
       return users
     } catch (error) {
       console.error('Error getting users:', error)
-      
+
       // If no profiles collection exists, return empty array instead of throwing error
       if ((error as any)?.code === 'failed-precondition' || (error as any)?.message?.includes('index')) {
         console.warn('Profiles collection may not exist or require index. Returning empty array.')
         return []
       }
-      
+
       throw new Error('Failed to fetch users')
     }
   }
@@ -132,16 +132,16 @@ export class UserService {
     try {
       // Generate a temporary password (user will need to reset it)
       const tempPassword = Math.random().toString(36).slice(-8) + 'A1!'
-      
+
       // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
-        auth, 
-        userData.email, 
+        auth,
+        userData.email,
         tempPassword
       )
-      
+
       const firebaseUser = userCredential.user
-      
+
       // Update the display name
       await updateProfile(firebaseUser, {
         displayName: userData.name
@@ -172,8 +172,8 @@ export class UserService {
 
       // Log activity
       await this.logUserActivity(
-        firebaseUser.uid, 
-        UserAction.USER_CREATED, 
+        firebaseUser.uid,
+        UserAction.USER_CREATED,
         'User account created by admin',
         { createdBy: 'admin', tempPassword: true }
       )
@@ -204,22 +204,22 @@ export class UserService {
 
       // Check if there are any collections that might contain user data
       const possibleCollections = ['userProfiles', 'profiles', 'userData', 'accounts']
-      
+
       for (const collectionName of possibleCollections) {
         try {
           const collectionRef = collection(db, collectionName)
           const snapshot = await getDocs(collectionRef)
-          
+
           if (!snapshot.empty) {
             console.log(`Found ${snapshot.docs.length} documents in ${collectionName} collection`)
-            
+
             for (const docSnap of snapshot.docs) {
               const data = docSnap.data()
-              
+
               // Check if this looks like user data
               if (data.email || data.userId || data.uid) {
                 const userId = data.userId || data.uid || docSnap.id
-                
+
                 // Check if user already exists in profiles collection
                 const existingUser = await this.getUserById(userId)
                 // Dedupe: also check by email if id-based document not found
@@ -334,7 +334,10 @@ export class UserService {
         updatedAt: Timestamp.fromDate(new Date()),
       }
 
-      await updateDoc(docRef, updateData)
+      // Remove undefined values to avoid Firebase error
+      const sanitizedData = this.sanitizeForFirestore(updateData)
+
+      await updateDoc(docRef, sanitizedData)
     } catch (error) {
       console.error('Error updating user:', error)
       throw new Error('Failed to update user')
@@ -448,11 +451,11 @@ export class UserService {
     try {
       // Simple query without orderBy to avoid index requirements
       const q = query(
-        this.userActivitiesCollection, 
+        this.userActivitiesCollection,
         where('userId', '==', userId)
       )
       const snapshot = await getDocs(q)
-      
+
       let activities = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
@@ -467,7 +470,7 @@ export class UserService {
           return dateB.getTime() - dateA.getTime()
         })
         .slice(0, limit)
-      
+
       return activities
     } catch (error) {
       console.error('Error getting user activities:', error)
@@ -504,7 +507,7 @@ export class UserService {
 
       // Get all users
       const users = await this.getUsers()
-      
+
       // Group users by email
       const usersByEmail = new Map<string, User[]>()
       users.forEach(user => {
@@ -528,7 +531,7 @@ export class UserService {
 
           // Keep the first user, remove the rest
           const usersToRemove = sortedUsers.slice(1)
-          
+
           for (const userToRemove of usersToRemove) {
             try {
               await this.deleteUser(userToRemove.id)
@@ -555,7 +558,7 @@ export class UserService {
   async getUserStats(): Promise<UserStats> {
     try {
       const users = await this.getUsers()
-      
+
       const stats: UserStats = {
         totalUsers: users.length,
         activeUsers: users.filter(u => u.status === UserStatus.ACTIVE).length,
@@ -575,8 +578,8 @@ export class UserService {
           return userDate >= monthAgo
         }).length,
         totalRevenue: users.reduce((sum, user) => sum + (user.totalSpent || 0), 0),
-        averageSpentPerUser: users.length > 0 
-          ? users.reduce((sum, user) => sum + (user.totalSpent || 0), 0) / users.length 
+        averageSpentPerUser: users.length > 0
+          ? users.reduce((sum, user) => sum + (user.totalSpent || 0), 0) / users.length
           : 0,
       }
 

@@ -21,6 +21,8 @@ export interface User {
   totalEvents?: number
   totalTickets?: number
   totalSpent?: number
+  // Bar assignment for bartenders
+  barName?: string
   // Profile fields merged from profiles collection
   bio?: string
   location?: string
@@ -142,4 +144,5 @@ export interface UpdateUserData {
   status?: UserStatus
   isBlocked?: boolean
   blockedReason?: string
+  barName?: string
 }

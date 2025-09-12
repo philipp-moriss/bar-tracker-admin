@@ -16,9 +16,19 @@ export interface Event {
   country: string
   includedDescription: string
   startLocationName: string
+  // Bar information embedded in event
+  barName: string
+  barAddress: string
+  barCity: string
+  barCountry: string
+  barPhone?: string
+  barEmail?: string
+  barWebsite?: string
   status?: EventStatus
   createdAt?: Timestamp | Date
   updatedAt?: Timestamp | Date
+  // Images
+  images?: string[] // URLs of uploaded images
 }
 
 export interface CreateEventData {
@@ -34,6 +44,16 @@ export interface CreateEventData {
     latitude: number
     longitude: number
   }
+  // Bar information embedded in event
+  barName: string
+  barAddress: string
+  barCity: string
+  barCountry: string
+  barPhone?: string
+  barEmail?: string
+  barWebsite?: string
+  // Images
+  images?: string[] // URLs of uploaded images
 }
 
 export interface UpdateEventData extends Partial<CreateEventData> {
