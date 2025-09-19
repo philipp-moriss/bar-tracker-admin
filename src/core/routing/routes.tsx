@@ -12,9 +12,9 @@ import { AdminBarsPage } from "@/pages/admin-bars";
 import { CreateBarPage } from "@/pages/admin-bars/create";
 import { AdminAnalyticsPage } from "@/pages/admin-analytics";
 import AdminDebugPage from "@/pages/admin-debug";
-import NotificationsPage from "@/pages/notifications.tsx";
 import { ProtectedRoute } from "@/core/routing/ProtectedRoute";
 import { createBrowserRouter } from "react-router-dom";
+import NotificationsPage from "@/pages/notifications";
 
 export const router = createBrowserRouter([
   {
