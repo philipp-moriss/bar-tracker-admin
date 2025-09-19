@@ -7,6 +7,7 @@ import {
   Building2,
   BarChart3,
   Settings,
+  Bell,
   Menu,
   X,
   Bug
@@ -49,6 +50,12 @@ const navigationItems = [
     href: '/admin/analytics',
     icon: BarChart3,
     description: 'Reports and statistics'
+  },
+  {
+    name: 'Notifications',
+    href: '/admin/notifications',
+    icon: Bell,
+    description: 'Push schedules'
   },
   {
     name: 'Settings',
