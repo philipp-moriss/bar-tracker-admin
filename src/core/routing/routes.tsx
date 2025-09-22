@@ -15,6 +15,7 @@ import AdminDebugPage from "@/pages/admin-debug";
 import { ProtectedRoute } from "@/core/routing/ProtectedRoute";
 import { createBrowserRouter } from "react-router-dom";
 import NotificationsPage from "@/pages/notifications";
+import { AdminSettingsPage } from "@/pages/admin-settings";
 
 export const router = createBrowserRouter([
   {
@@ -121,6 +122,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <AdminAnalyticsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "settings",
+        element: (
+          <ProtectedRoute>
+            <AdminSettingsPage />
           </ProtectedRoute>
         ),
       },

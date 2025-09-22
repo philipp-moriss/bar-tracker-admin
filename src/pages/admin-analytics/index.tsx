@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { BarChart3, TrendingUp, Users, Calendar, DollarSign, Eye, Activity } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import {
   Card,
+  CardContent,
   CardHeader,
   CardTitle,
-  CardContent,
 } from '@/core/components/ui/card';
 import { AnalyticsService } from '@/core/services/analyticsService';
+import { Activity, BarChart3, Calendar, DollarSign, Eye, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export const AdminAnalyticsPage = () => {
   const [loading, setLoading] = useState(true);
