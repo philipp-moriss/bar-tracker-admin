@@ -6,6 +6,7 @@ export interface Bar {
     address: string
     city: string
     country: string
+    coordinates: { latitude: number; longitude: number }
     phone?: string
     email?: string
     website?: string
@@ -27,6 +28,7 @@ export interface CreateBarData {
     address: string
     city: string
     country: string
+    coordinates?: { latitude: number; longitude: number }
     phone?: string
     email?: string
     website?: string
@@ -42,6 +44,7 @@ export interface UpdateBarData {
     address?: string
     city?: string
     country?: string
+    coordinates?: { latitude: number; longitude: number }
     phone?: string
     email?: string
     website?: string

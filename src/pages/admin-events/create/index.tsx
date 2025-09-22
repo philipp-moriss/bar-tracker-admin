@@ -29,9 +29,10 @@ import { Textarea } from '@/core/components/ui/inputs/textarea';
 import { Select } from '@/core/components/ui/inputs/select';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
-import { CreateEventData } from '@/core/types/event';
+import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation } from '@/core/types/event';
 import { Bar } from '@/core/types/bar';
 import { AnalyticsService } from '@/core/services/analyticsService';
+import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
 
 // Form validation schema
 const createEventSchema = z.object({
@@ -58,6 +59,43 @@ export const CreateEventPage = () => {
   const [bars, setBars] = useState<Bar[]>([]);
   const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
   const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
+  const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
+  const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
+
+  // Автоматически создать стартовую локацию из выбранного бара
+  useEffect(() => {
+    if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
+      const startLocation: EventLocation = {
+        id: `start_location_${selectedBar.id}`,
+        name: selectedBar.name,
+        address: selectedBar.address,
+        coordinates: { latitude: selectedBar.coordinates.latitude, longitude: selectedBar.coordinates.longitude },
+        order: 0,
+        stayDuration: 60, // Увеличиваем время для стартовой локации
+        description: `Starting location at ${selectedBar.name}`,
+        barName: selectedBar.name,
+        barAddress: selectedBar.address,
+        barPhone: selectedBar.phone,
+        barEmail: selectedBar.email,
+      };
+
+      const initialRoute: EventRoute = {
+        locations: [startLocation],
+        totalDuration: startLocation.stayDuration,
+        isActive: true,
+      };
+
+      setEventRoute(initialRoute);
+
+      // Автоматически включаем настройки уведомлений для pub crawl
+      setNotificationSettings({
+        startReminder: 15,        // 15 минут до начала
+        locationReminders: 10,    // 10 минут до перехода
+        arrivalNotifications: true,
+        departureNotifications: true,
+      });
+    }
+  }, [selectedBar, eventRoute]);
 
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventSchema),
@@ -124,6 +162,9 @@ export const CreateEventPage = () => {
         barWebsite: bar.website || undefined,
         // Images
         images: uploadedImages.map(img => img.url),
+        // Новые поля для маршрутов
+        route: eventRoute,
+        notificationSettings: notificationSettings,
       };
 
       await eventService.createEvent(eventData);
@@ -149,7 +190,7 @@ export const CreateEventPage = () => {
   };
 
   return (
-    <AdminLayout title="Create New Event" subtitle="Create a new BarTrekker event or tour">
+    <AdminLayout title="Create New Event Tour" subtitle="Create a multi-location BarTrekker pub crawl or tour experience">
       <div className="max-w-4xl mx-auto">
         {/* Back Button */}
         <div className="mb-6">
@@ -170,6 +211,29 @@ export const CreateEventPage = () => {
           </div>
         )}
 
+        {/* Info Banner */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-blue-800">Creating a Multi-Location Event Tour</h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <p>BarTrekker events are designed as guided tours through multiple locations. Here's how it works:</p>
+                <ul className="mt-2 list-disc list-inside space-y-1">
+                  <li><strong>Start Location:</strong> Choose your first bar where participants will gather</li>
+                  <li><strong>Additional Stops:</strong> Add 2-4 more bars to create the complete tour route</li>
+                  <li><strong>Automatic Navigation:</strong> Participants receive real-time directions and notifications</li>
+                  <li><strong>Timed Progression:</strong> Each location has a customizable duration (30-90 minutes)</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Form */}
         <Card>
           <CardHeader>
@@ -181,9 +245,10 @@ export const CreateEventPage = () => {
           <CardContent>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                {/* Bar Selection */}
+                {/* Starting Location Selection */}
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Bar Selection</h3>
+                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Starting Location</h3>
+                  <p className="text-sm text-gray-600">Select the first bar where your event tour will begin. Additional stops will be added in the route section below.</p>
 
                   <FormField
                     control={form.control}
@@ -513,6 +578,16 @@ export const CreateEventPage = () => {
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+
+                {/* Event Route Manager */}
+                <EventRouteManager
+                  route={eventRoute}
+                  notificationSettings={notificationSettings}
+                  onRouteChange={setEventRoute}
+                  onNotificationSettingsChange={setNotificationSettings}
+                  bars={bars}
+                  startBar={selectedBar}
                 />
 
                 {/* Submit Button */}
