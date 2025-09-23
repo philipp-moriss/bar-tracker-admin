@@ -10,6 +10,7 @@ import { UserProfilePage } from "@/pages/admin-users/profile";
 import CreateUserPage from "@/pages/admin-users/create";
 import { AdminBarsPage } from "@/pages/admin-bars";
 import { CreateBarPage } from "@/pages/admin-bars/create";
+import { EditBarPage } from "@/pages/admin-bars/edit/[id]";
 import { AdminAnalyticsPage } from "@/pages/admin-analytics";
 import AdminDebugPage from "@/pages/admin-debug";
 import { ProtectedRoute } from "@/core/routing/ProtectedRoute";
@@ -114,6 +115,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <CreateBarPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "bars/edit/:id",
+        element: (
+          <ProtectedRoute>
+            <EditBarPage />
           </ProtectedRoute>
         ),
       },

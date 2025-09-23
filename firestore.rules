@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Bars collection
+    match /bars/{barId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // Events collection
+    match /events/{eventId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
+    // Optionally allow reads to other public collections
+    match /{document=**} {
+      allow read: if false; // default deny
+    }
+  }
+}

@@ -219,11 +219,19 @@ export const AdminBarsPage = () => {
                                             <TableRow key={bar.id}>
                                                 <TableCell>
                                                     <div className="flex items-center space-x-3">
-                                                        <div className="w-10 h-10 bg-barTrekker-orange rounded-full flex items-center justify-center">
-                                                            <span className="text-white font-semibold text-sm">
-                                                                {bar.name.charAt(0)}
-                                                            </span>
-                                                        </div>
+                                                        {bar.images && bar.images.length > 0 ? (
+                                                            <img
+                                                                src={bar.images[0]}
+                                                                alt={bar.name}
+                                                                className="w-10 h-10 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-10 h-10 bg-barTrekker-orange rounded-full flex items-center justify-center">
+                                                                <span className="text-white font-semibold text-sm">
+                                                                    {bar.name.charAt(0)}
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                         <div>
                                                             <div className="font-medium">{bar.name}</div>
                                                             <div className="text-sm text-barTrekker-darkGrey/70">

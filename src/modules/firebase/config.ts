@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 import { getFunctions, connectFunctionsEmulator } from "firebase/functions";
@@ -23,6 +23,13 @@ export const firebaseApp = initializeApp(firebaseConfig);
 
 // Initialize Firestore
 export const db = getFirestore(firebaseApp);
+if (import.meta.env.DEV) {
+  try {
+    connectFirestoreEmulator(db, 'localhost', 8080);
+  } catch (e) {
+    // ignore double-connect on HMR
+  }
+}
 
 // Initialize Auth
 export const auth = getAuth(firebaseApp);

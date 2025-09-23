@@ -58,10 +58,12 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
         const imageToRemove = images[index]
 
         try {
-            // Delete from storage
-            await imageService.deleteImage(imageToRemove.path)
+            // Delete from storage only if path is provided
+            if (imageToRemove.path) {
+                await imageService.deleteImage(imageToRemove.path)
+            }
 
-            // Remove from state
+            // Remove from state regardless
             const newImages = images.filter((_, i) => i !== index)
             setImages(newImages)
             onImagesChange(newImages)

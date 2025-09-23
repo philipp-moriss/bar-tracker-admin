@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Calendar, MapPin, DollarSign, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, MapPin, DollarSign } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
 import { ImageUploadResult } from '@/core/services/imageService';
-import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
+// Coordinates are derived from selected bar; no direct importer needed here
 
 import { Button } from '@/core/components/ui/button';
 import {
@@ -26,7 +26,7 @@ import {
 } from '@/core/components/ui/form';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Textarea } from '@/core/components/ui/inputs/textarea';
-import { Select } from '@/core/components/ui/inputs/select';
+// import { Select } from '@/core/components/ui/inputs/select';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
 import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation } from '@/core/types/event';
@@ -43,9 +43,6 @@ const createEventSchema = z.object({
   startLocationName: z.string().min(1, "Venue is required"),
   includedDescription: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
-  imageURL: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  latitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid latitude"),
-  longitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid longitude"),
   // Bar selection
   barId: z.string().min(1, "Please select a bar"),
 });
@@ -57,7 +54,7 @@ export const CreateEventPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bars, setBars] = useState<Bar[]>([]);
-  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
+  const [selectedBar, setSelectedBar] = useState<Bar | undefined>(undefined);
   const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
@@ -107,9 +104,6 @@ export const CreateEventPage = () => {
       startLocationName: '',
       includedDescription: '',
       startTime: '',
-      imageURL: '',
-      latitude: '',
-      longitude: '',
       barId: '',
     },
   });
@@ -139,6 +133,7 @@ export const CreateEventPage = () => {
         return;
       }
 
+      const primaryImage = uploadedImages[0]?.url || 'https://via.placeholder.com/400x200'
       const eventData: CreateEventData = {
         name: data.name,
         description: data.description,
@@ -147,10 +142,10 @@ export const CreateEventPage = () => {
         startLocationName: data.startLocationName,
         includedDescription: data.includedDescription || '',
         startTime: new Date(data.startTime),
-        imageURL: data.imageURL || 'https://via.placeholder.com/400x200',
+        imageURL: primaryImage,
         startLocation: {
-          latitude: parseFloat(data.latitude),
-          longitude: parseFloat(data.longitude),
+          latitude: bar.coordinates.latitude,
+          longitude: bar.coordinates.longitude,
         },
         // Bar information from selected bar
         barName: bar.name,
@@ -264,7 +259,7 @@ export const CreateEventPage = () => {
                             onChange={(e) => {
                               field.onChange(e.target.value);
                               const bar = bars.find(b => b.id === e.target.value);
-                              setSelectedBar(bar || null);
+                              setSelectedBar(bar);
                             }}
                             className="w-full p-3 border border-barTrekker-lightGrey rounded-md bg-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange focus:outline-none"
                           >
@@ -445,63 +440,7 @@ export const CreateEventPage = () => {
                   />
                 </div>
 
-                {/* Google Maps Importer */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Location Coordinates</h3>
-                  <GoogleMapsImporter
-                    onCoordinatesFound={(latitude, longitude) => {
-                      form.setValue('latitude', latitude.toString())
-                      form.setValue('longitude', longitude.toString())
-                    }}
-                  />
-                </div>
-
-                {/* Coordinates */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="latitude"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Latitude *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            step="any"
-                            placeholder="e.g., 40.7128"
-                            className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="longitude"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Longitude *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            step="any"
-                            placeholder="e.g., -74.0060"
-                            className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                {/* Coordinates are derived from selected bar automatically */}
 
                 {/* Date and Time */}
                 <FormField
@@ -557,28 +496,7 @@ export const CreateEventPage = () => {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="imageURL"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                        Fallback Image URL (optional)
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <ImageIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                          <Input
-                            {...field}
-                            placeholder="https://example.com/image.jpg"
-                            className="pl-10 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* No fallback URL field; primary image is first uploaded image */}
 
                 {/* Event Route Manager */}
                 <EventRouteManager
