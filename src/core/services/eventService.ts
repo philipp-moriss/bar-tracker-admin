@@ -118,8 +118,28 @@ const eventsCollection = collection(db, 'events')
   async function createEvent(eventData: CreateEventData): Promise<Event> {
     try {
       const now = new Date()
+      // Remove undefined values deeply (objects/arrays)
+      const removeUndefinedDeep = (input: any): any => {
+        if (Array.isArray(input)) {
+          return input
+            .map(removeUndefinedDeep)
+            .filter((v) => v !== undefined)
+        }
+        if (input && typeof input === 'object') {
+          const out: Record<string, any> = {}
+          Object.entries(input).forEach(([k, v]) => {
+            const cleaned = removeUndefinedDeep(v)
+            if (cleaned !== undefined) out[k] = cleaned
+          })
+          return out
+        }
+        return input === undefined ? undefined : input
+      }
+
+      const sanitized = removeUndefinedDeep(eventData)
+
       const eventToCreate = {
-        ...eventData,
+        ...sanitized,
         startTime: Timestamp.fromDate(eventData.startTime),
         status: EventStatus.ACTIVE,
         rating: 0,
