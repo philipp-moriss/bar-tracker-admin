@@ -396,7 +396,7 @@ export const AdminTicketsPage = () => {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   };
 
-  const formatPrice = (price: number, currency: string = 'USD') => {
+  const formatPrice = (price: number, currency: string = 'GBP') => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency,

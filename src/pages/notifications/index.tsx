@@ -97,7 +97,7 @@ export default function NotificationsPage() {
             </div>
             <div>
               <Label>Send at</Label>
-              <Input type="datetime-local" onChange={e => setForm({ ...form, fireDate: new Date(e.target.value).getTime() })} />
+              <Input type="datetime-local" lang="en-GB" onChange={e => setForm({ ...form, fireDate: new Date(e.target.value).getTime() })} />
             </div>
             <div>
               <Label>Audience UIDs (comma-separated)</Label>

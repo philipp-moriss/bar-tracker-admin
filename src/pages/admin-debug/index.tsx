@@ -67,7 +67,8 @@ export default function AdminDebugPage() {
       setUsersCount(usersSnapshot.size);
       
     } catch (error) {
-      console.error('Error loading data:', error);
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Error loading data:', message)
     } finally {
       setLoading(false);
     }
@@ -84,8 +85,7 @@ export default function AdminDebugPage() {
         qrCode: `QR-${Date.now()}`,
         status: 'active',
         purchaseDate: Timestamp.fromDate(new Date()),
-        price: 2500, // $25.00 in cents
-        currency: 'USD',
+        price: 2500, 
         eventName: 'Test Event',
         eventDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // 7 days from now
         eventLocation: 'Test Location',
@@ -99,8 +99,9 @@ export default function AdminDebugPage() {
       console.log('Test ticket created successfully in tickets collection');
       alert('Test ticket created successfully!');
     } catch (error) {
-      console.error('Error creating test ticket:', error);
-      alert('Error creating test ticket: ' + error.message);
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Error creating test ticket:', message)
+      alert('Error creating test ticket: ' + message)
     } finally {
       setLoading(false);
     }
@@ -118,7 +119,7 @@ export default function AdminDebugPage() {
         status: 'active',
         purchaseDate: Timestamp.fromDate(new Date()),
         price: 2500,
-        currency: 'USD',
+        currency: 'GBP',
         eventName: 'Test Event',
         eventDate: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
         eventLocation: 'Test Location',
@@ -132,8 +133,9 @@ export default function AdminDebugPage() {
       console.log(`Test ticket created successfully in ${collectionName} collection`);
       alert(`Test ticket created successfully in ${collectionName} collection!`);
     } catch (error) {
-      console.error(`Error creating test ticket in ${collectionName}:`, error);
-      alert(`Error creating test ticket in ${collectionName}: ` + error.message);
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(`Error creating test ticket in ${collectionName}:`, message)
+      alert(`Error creating test ticket in ${collectionName}: ` + message)
     } finally {
       setLoading(false);
     }
@@ -167,7 +169,8 @@ export default function AdminDebugPage() {
       
       console.log('Test event created successfully');
     } catch (error) {
-      console.error('Error creating test event:', error);
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Error creating test event:', message)
     } finally {
       setLoading(false);
     }
@@ -190,7 +193,8 @@ export default function AdminDebugPage() {
       setUserTickets(tickets);
       console.log(`Found ${tickets.length} tickets for user ${userId}`);
     } catch (error) {
-      console.error('Error checking user tickets:', error);
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Error checking user tickets:', message)
     } finally {
       setUserTicketsLoading(false);
     }
@@ -350,7 +354,7 @@ export default function AdminDebugPage() {
                             <p className="text-sm text-gray-600">Status: {ticket.status}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-sm text-gray-600">Price: ${(ticket.price / 100).toFixed(2)}</p>
+                            <p className="text-sm text-gray-600">Price: £{(ticket.price / 100).toFixed(2)}</p>
                             <p className="text-xs text-gray-500">
                               {ticket.purchaseDate?.toDate?.()?.toLocaleDateString() || 'No date'}
                             </p>

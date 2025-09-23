@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Calendar, MapPin, DollarSign } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, MapPin } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
 import { ImageUploadResult } from '@/core/services/imageService';
@@ -40,10 +40,9 @@ const createEventSchema = z.object({
   description: z.string().min(1, "Description is required").min(10, "Description must be at least 10 characters"),
   price: z.string().min(1, "Price is required").refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Price must be a positive number"),
   country: z.string().min(1, "Country is required"),
-  startLocationName: z.string().min(1, "Venue is required"),
+  startLocationName: z.string().optional(),
   includedDescription: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
-  // Bar selection
   barId: z.string().min(1, "Please select a bar"),
 });
 
@@ -59,7 +58,6 @@ export const CreateEventPage = () => {
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
 
-  // Автоматически создать стартовую локацию из выбранного бара
   useEffect(() => {
     if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
       const startLocation: EventLocation = {
@@ -68,7 +66,7 @@ export const CreateEventPage = () => {
         address: selectedBar.address,
         coordinates: { latitude: selectedBar.coordinates.latitude, longitude: selectedBar.coordinates.longitude },
         order: 0,
-        stayDuration: 60, // Увеличиваем время для стартовой локации
+        stayDuration: 60, 
         description: `Starting location at ${selectedBar.name}`,
         barName: selectedBar.name,
         barAddress: selectedBar.address,
@@ -84,10 +82,9 @@ export const CreateEventPage = () => {
 
       setEventRoute(initialRoute);
 
-      // Автоматически включаем настройки уведомлений для pub crawl
       setNotificationSettings({
-        startReminder: 15,        // 15 минут до начала
-        locationReminders: 10,    // 10 минут до перехода
+        startReminder: 15,       
+        locationReminders: 10,   
         arrivalNotifications: true,
         departureNotifications: true,
       });
@@ -107,6 +104,13 @@ export const CreateEventPage = () => {
       barId: '',
     },
   });
+
+  // Автозаполнение названия старта именем выбранного бара
+  useEffect(() => {
+    if (selectedBar) {
+      form.setValue('startLocationName', selectedBar.name)
+    }
+  }, [selectedBar])
 
   // Load bars on component mount
   useEffect(() => {
@@ -139,7 +143,7 @@ export const CreateEventPage = () => {
         description: data.description,
         price: data.price,
         country: data.country,
-        startLocationName: data.startLocationName,
+        startLocationName: data.startLocationName || bar.name,
         includedDescription: data.includedDescription || '',
         startTime: new Date(data.startTime),
         imageURL: primaryImage,
@@ -155,9 +159,7 @@ export const CreateEventPage = () => {
         barPhone: bar.phone || undefined,
         barEmail: bar.email || undefined,
         barWebsite: bar.website || undefined,
-        // Images
         images: uploadedImages.map(img => img.url),
-        // Новые поля для маршрутов
         route: eventRoute,
         notificationSettings: notificationSettings,
       };
@@ -353,11 +355,11 @@ export const CreateEventPage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Price (USD) *
+                          Price (GBP) *
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-barTrekker-darkGrey/70 text-sm">£</span>
                             <Input
                               {...field}
                               type="number"
@@ -416,28 +418,7 @@ export const CreateEventPage = () => {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="startLocationName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Venue *
-                        </FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                            <Input
-                              {...field}
-                              placeholder="Enter venue name"
-                              className="pl-10 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* startLocationName is auto-filled from selected bar; field hidden */}
                 </div>
 
                 {/* Coordinates are derived from selected bar automatically */}
@@ -455,6 +436,7 @@ export const CreateEventPage = () => {
                         <Input
                           {...field}
                           type="datetime-local"
+                            lang="en-GB"
                           className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                         />
                       </FormControl>
