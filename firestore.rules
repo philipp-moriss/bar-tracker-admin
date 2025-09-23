@@ -13,6 +13,12 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null;
     }
 
+    // Tickets collection (admin needs to list tickets)
+    match /tickets/{ticketId} {
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+
     // Optionally allow reads to other public collections
     match /{document=**} {
       allow read: if false; // default deny
