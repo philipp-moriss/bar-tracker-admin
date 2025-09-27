@@ -3,7 +3,6 @@ import {
   doc,
   getDocs,
   getDoc,
-  addDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -33,79 +32,128 @@ export class TicketService {
    */
   async getTickets(filters?: TicketFilters): Promise<Ticket[]> {
     try {
-
-      // Читаем из обеих коллекций: ticketGroups и tickets
+      // Читаем из двух коллекций: ticketGroups и tickets
       const [ticketGroupsSnapshot, ticketsSnapshot] = await Promise.all([
         getDocs(query(this.ticketGroupsCollection, orderBy('createdAt', 'desc'))),
         getDocs(query(collection(db, 'tickets'), orderBy('createdAt', 'desc')))
       ]);
 
+      // Создаем мапу данных из tickets для быстрого поиска по paymentId
+      const ticketsMap = new Map();
+      ticketsSnapshot.docs.forEach((doc) => {
+        const data = doc.data();
+        if (data.paymentId) {
+          ticketsMap.set(data.paymentId, {
+            id: doc.id,
+            ...data,
+            purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
+            usedDate: data.status === 'scanned' ? (data.scannedAt?.toDate() || new Date()) : undefined,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+          });
+        }
+      });
 
-      // Обрабатываем ticketGroups
+      // Обрабатываем ticketGroups и объединяем с данными из tickets
       const ticketGroups = ticketGroupsSnapshot.docs.map((doc) => {
         const data = doc.data();
-
-        return {
-          id: doc.id,
-          eventId: data.eventId || '',
-          userId: data.userId || data.pusherUserId || '',
-          inviteCode: data.inviteCode || '',
-          qrCode: data.qrCode || '',
-          status: data.status === 'active' ? TicketStatus.ACTIVE :
-            data.status === 'used' ? TicketStatus.USED :
-              data.status === 'cancelled' ? TicketStatus.CANCELLED :
-                data.status === 'expired' ? TicketStatus.EXPIRED :
-                  !data.status ? TicketStatus.ACTIVE : // Если статус undefined, считаем активным
-                    TicketStatus.ACTIVE, // По умолчанию ACTIVE для ticketGroups
-          purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
-          usedDate: data.usedDate?.toDate() || undefined,
-          price: data.price || 0,
-          currency: data.currency || 'USD',
-          paymentIntentId: data.paymentIntentId || data.paymentId || '',
-          paymentId: data.paymentId || '',
-          mainTicketId: data.mainTicketId || '',
-          groupName: data.groupName || '',
-          eventName: data.eventName || '',
-          eventDate: data.eventDate?.toDate() || undefined,
-          eventLocation: data.eventLocation || '',
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        } as Ticket;
+        const ticketData = ticketsMap.get(data.paymentId);
+        
+        // Если есть данные в tickets, используем их, иначе данные из ticketGroups
+        if (ticketData) {
+          return {
+            id: ticketData.id, // Используем ID из tickets
+            eventId: ticketData.eventId || '',
+            userId: ticketData.userId || '',
+            inviteCode: ticketData.inviteCode || '',
+            qrCode: ticketData.qrCode || '',
+            status: ticketData.status === 'scanned' ? TicketStatus.SCANNED :
+              ticketData.status === 'unscanned' ? TicketStatus.ACTIVE :
+                ticketData.status === 'paid' ? TicketStatus.ACTIVE :
+                  ticketData.status === 'confirmed' ? TicketStatus.ACTIVE :
+                    TicketStatus.ACTIVE,
+            purchaseDate: ticketData.purchaseDate,
+            usedDate: ticketData.usedDate,
+            price: ticketData.price || ticketData.amount || 0,
+            currency: ticketData.currency || 'GBP',
+            paymentIntentId: ticketData.paymentIntentId || ticketData.paymentId || '',
+            paymentId: ticketData.paymentId || '',
+            mainTicketId: ticketData.mainTicketId || '',
+            groupName: ticketData.groupName || '',
+            eventName: ticketData.eventName || '',
+            eventDate: ticketData.eventDate?.toDate() || undefined,
+            eventLocation: ticketData.eventLocation || '',
+            createdAt: ticketData.createdAt,
+            updatedAt: ticketData.updatedAt,
+          } as Ticket;
+        } else {
+          // Fallback на данные из ticketGroups
+          return {
+            id: doc.id,
+            eventId: data.eventId || '',
+            userId: data.pusherUserId || '',
+            inviteCode: data.inviteCode || '',
+            qrCode: data.qrCode || '',
+            status: data.isScanned ? TicketStatus.SCANNED : TicketStatus.ACTIVE,
+            purchaseDate: data.createdAt?.toDate() || new Date(),
+            usedDate: data.scannedAt?.toDate() || undefined,
+            price: 0, // Нет доступа к purchases
+            currency: 'GBP',
+            paymentIntentId: data.paymentId || '',
+            paymentId: data.paymentId || '',
+            mainTicketId: data.mainTicketId || '',
+            groupName: '',
+            eventName: 'Unknown Event',
+            eventDate: undefined,
+            eventLocation: '',
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.createdAt?.toDate() || new Date(),
+          } as Ticket;
+        }
       });
 
-      // Обрабатываем tickets (тестовые данные)
-      const tickets = ticketsSnapshot.docs.map((doc) => {
-        const data = doc.data();
+      // Добавляем в итог также те документы из tickets, у которых нет пары в ticketGroups (по paymentId)
+      const ticketGroupPaymentIds = new Set(
+        ticketGroupsSnapshot.docs.map((d) => (d.data() as any).paymentId).filter(Boolean)
+      );
 
-        return {
-          id: doc.id,
-          eventId: data.eventId || '',
-          userId: data.userId || '',
-          inviteCode: data.inviteCode || '',
-          qrCode: data.qrCode || '',
-          status: data.status === 'scanned' ? TicketStatus.SCANNED :
-            data.status === 'unscanned' ? TicketStatus.ACTIVE :
-              data.status === 'paid' ? TicketStatus.ACTIVE :
-                data.status === 'confirmed' ? TicketStatus.ACTIVE :
-                  TicketStatus.ACTIVE, // По умолчанию ACTIVE для tickets
-          purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
-          usedDate: data.status === 'scanned' ? (data.scannedAt?.toDate() || new Date()) : undefined,
-          price: data.price || data.amount || 0,
-          currency: data.currency || 'USD',
-          paymentIntentId: data.paymentIntentId || data.paymentId || '',
-          paymentId: data.paymentId || '',
-          mainTicketId: data.mainTicketId || '',
-          groupName: data.groupName || '',
-          eventName: data.eventName || '',
-          eventDate: data.eventDate?.toDate() || undefined,
-          eventLocation: data.eventLocation || '',
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
-        } as Ticket;
-      });
+      const orphanTickets = ticketsSnapshot.docs
+        .filter((t) => {
+          const data: any = t.data();
+          const pid = data.paymentId;
+          return !pid || !ticketGroupPaymentIds.has(pid);
+        })
+        .map((t) => {
+          const td: any = t.data();
+          return {
+            id: t.id,
+            eventId: td.eventId || '',
+            userId: td.userId || '',
+            inviteCode: td.inviteCode || '',
+            qrCode: td.qrCode || '',
+            status: td.status === 'scanned' ? TicketStatus.SCANNED :
+              td.status === 'unscanned' ? TicketStatus.ACTIVE :
+                td.status === 'paid' ? TicketStatus.ACTIVE :
+                  td.status === 'confirmed' ? TicketStatus.ACTIVE :
+                    TicketStatus.ACTIVE,
+            purchaseDate: td.purchaseDate?.toDate() || td.createdAt?.toDate() || new Date(),
+            usedDate: td.status === 'scanned' ? (td.scannedAt?.toDate() || new Date()) : undefined,
+            price: td.price || td.amount || 0,
+            currency: (td.currency || 'GBP').toString().toUpperCase(),
+            paymentIntentId: td.paymentIntentId || td.paymentId || '',
+            paymentId: td.paymentId || '',
+            mainTicketId: td.mainTicketId || '',
+            groupName: td.groupName || '',
+            eventName: td.eventName || '',
+            eventDate: td.eventDate?.toDate() || undefined,
+            eventLocation: td.eventLocation || '',
+            createdAt: td.createdAt?.toDate() || new Date(),
+            updatedAt: td.updatedAt?.toDate() || new Date(),
+          } as Ticket;
+        });
 
-      // Объединяем результаты
-      let allTickets = [...ticketGroups, ...tickets];
+      // Убираем дедупликацию - показываем все билеты (ticketGroups + tickets без пары)
+      let allTickets = [...ticketGroups, ...orphanTickets];
 
       // Применяем фильтры
       if (filters?.status) {
@@ -179,7 +227,7 @@ export class TicketService {
           purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
           usedDate: data.usedDate?.toDate() || undefined,
           price: data.price || 0,
-          currency: data.currency || 'USD',
+          currency: data.currency || 'GBP',
           paymentIntentId: data.paymentIntentId || data.paymentId || '',
           paymentId: data.paymentId || '',
           mainTicketId: data.mainTicketId || '',
@@ -225,7 +273,7 @@ export class TicketService {
           purchaseDate: data.purchaseDate?.toDate() || data.createdAt?.toDate() || new Date(),
           usedDate: data.usedDate?.toDate() || undefined,
           price: data.price || 0,
-          currency: data.currency || 'USD',
+          currency: data.currency || 'GBP',
           paymentIntentId: data.paymentIntentId || data.paymentId || '',
           paymentId: data.paymentId || '',
           mainTicketId: data.mainTicketId || '',
@@ -250,6 +298,7 @@ export class TicketService {
    */
   async updateTicketStatus(id: string, status: TicketStatus, usedDate?: Date): Promise<void> {
     try {
+      
       // Определяем, в какой коллекции находится билет
       let docRef;
       let updateData: any = {
@@ -263,14 +312,49 @@ export class TicketService {
 
         if (docSnap.exists()) {
           // Билет найден в ticketGroups
-          updateData.status = status;
-          if (status === TicketStatus.USED && usedDate) {
-            updateData.usedDate = Timestamp.fromDate(usedDate);
+          if (status === TicketStatus.USED || status === TicketStatus.SCANNED) {
+            updateData.isScanned = true;
+            if (usedDate) {
+              updateData.scannedAt = Timestamp.fromDate(usedDate);
+            }
+          } else if (status === TicketStatus.ACTIVE) {
+            updateData.isScanned = false;
           }
+
           await updateDoc(docRef, updateData);
+          
+          // Также обновляем соответствующий документ в tickets по paymentId
+          const data = docSnap.data();
+          if (data.paymentId) {
+            try {
+              const ticketQuery = query(collection(db, 'tickets'), where('paymentId', '==', data.paymentId));
+              const ticketSnapshot = await getDocs(ticketQuery);
+              if (!ticketSnapshot.empty) {
+                const ticketDoc = ticketSnapshot.docs[0];
+                const ticketUpdateData: any = {
+                  updatedAt: Timestamp.fromDate(new Date()),
+                };
+                
+                if (status === TicketStatus.USED || status === TicketStatus.SCANNED) {
+                  ticketUpdateData.status = 'scanned';
+                  if (usedDate) {
+                    ticketUpdateData.scannedAt = Timestamp.fromDate(usedDate);
+                  }
+                } else if (status === TicketStatus.ACTIVE) {
+                  ticketUpdateData.status = 'unscanned';
+                }
+                
+                await updateDoc(doc(collection(db, 'tickets'), ticketDoc.id), ticketUpdateData);
+              }
+            } catch (error) {
+              
+            }
+          }
+          
           return;
         }
       } catch (error) {
+        
       }
 
       // Если не найден в ticketGroups, пробуем в tickets
@@ -293,10 +377,45 @@ export class TicketService {
             updateData.status = status.toLowerCase();
           }
 
-          await updateDoc(docRef, updateData);
+          // Пытаемся обновить tickets; если нет прав — продолжаем без ошибки
+          try {
+            await updateDoc(docRef, updateData);
+          } catch (e) {
+            
+          }
+          
+          // Также обновляем соответствующий документ в ticketGroups по paymentId
+          const data = docSnap.data();
+          if (data.paymentId) {
+            try {
+              const ticketGroupQuery = query(this.ticketGroupsCollection, where('paymentId', '==', data.paymentId));
+              const ticketGroupSnapshot = await getDocs(ticketGroupQuery);
+              if (!ticketGroupSnapshot.empty) {
+                const ticketGroupDoc = ticketGroupSnapshot.docs[0];
+                const ticketGroupUpdateData: any = {
+                  updatedAt: Timestamp.fromDate(new Date()),
+                };
+                
+                if (status === TicketStatus.USED || status === TicketStatus.SCANNED) {
+                  ticketGroupUpdateData.isScanned = true;
+                  if (usedDate) {
+                    ticketGroupUpdateData.scannedAt = Timestamp.fromDate(usedDate);
+                  }
+                } else if (status === TicketStatus.ACTIVE) {
+                  ticketGroupUpdateData.isScanned = false;
+                }
+                
+                await updateDoc(doc(this.ticketGroupsCollection, ticketGroupDoc.id), ticketGroupUpdateData);
+              }
+            } catch (error) {
+              
+            }
+          }
+          
           return;
         }
       } catch (error) {
+        
       }
 
       // Если билет не найден ни в одной коллекции

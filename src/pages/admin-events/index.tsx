@@ -151,7 +151,7 @@ export const AdminEventsPage = () => {
   };
 
   const formatPrice = (price: string) => {
-    return `$${parseFloat(price || '0').toFixed(2)}`;
+    return `£${parseFloat(price || '0').toFixed(2)}`;
   };
 
   return (

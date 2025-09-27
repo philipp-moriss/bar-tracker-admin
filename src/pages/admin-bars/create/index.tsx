@@ -38,10 +38,9 @@ const createBarSchema = z.object({
     email: z.string().email("Must be a valid email").optional().or(z.literal("")),
     website: z.string().url("Must be a valid URL").optional().or(z.literal("")),
     description: z.string().optional(),
-    imageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-    isActive: z.boolean().default(true),
-    latitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid latitude"),
-    longitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid longitude"),
+    isActive: z.boolean(),
+    latitude: z.coerce.number().refine((val) => Number.isFinite(val) && val >= -90 && val <= 90, "Must be a valid latitude (-90..90)"),
+    longitude: z.coerce.number().refine((val) => Number.isFinite(val) && val >= -180 && val <= 180, "Must be a valid longitude (-180..180)"),
 });
 
 type CreateBarFormData = z.infer<typeof createBarSchema>;
@@ -62,10 +61,9 @@ export const CreateBarPage = () => {
             email: '',
             website: '',
             description: '',
-            imageUrl: '',
             isActive: true,
-            latitude: '',
-            longitude: '',
+            latitude: 0,
+            longitude: 0,
         },
     });
 
@@ -74,6 +72,7 @@ export const CreateBarPage = () => {
             setLoading(true);
 
             // Clean up empty strings
+            const round = (v: number) => Math.round(v * 1e6) / 1e6
             const cleanData: CreateBarData = {
                 name: data.name,
                 address: data.address,
@@ -83,13 +82,13 @@ export const CreateBarPage = () => {
                 email: data.email || undefined,
                 website: data.website || undefined,
                 description: data.description || undefined,
-                imageUrl: data.imageUrl || undefined,
                 isActive: data.isActive,
                 // Images
                 images: uploadedImages.map(img => img.url),
+                coordinates: { latitude: round(data.latitude), longitude: round(data.longitude) },
             };
 
-            const barId = await barService.createBar(cleanData);
+            await barService.createBar(cleanData);
 
             toast.success('Bar created successfully!');
             navigate('/admin/bars');
@@ -279,33 +278,16 @@ export const CreateBarPage = () => {
                                     />
                                 </div>
 
-                                <FormField
-                                    control={form.control}
-                                    name="imageUrl"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                                                Fallback Image URL (optional)
-                                            </FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    {...field}
-                                                    placeholder="Enter image URL"
-                                                    className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
+                                
 
                                 {/* Google Maps Importer */}
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Location Coordinates</h3>
                                     <GoogleMapsImporter
                                         onCoordinatesFound={(latitude, longitude) => {
-                                            form.setValue('latitude', latitude.toString())
-                                            form.setValue('longitude', longitude.toString())
+                                            const round = (v: number) => Math.round(v * 1e6) / 1e6
+                                            form.setValue('latitude', round(latitude))
+                                            form.setValue('longitude', round(longitude))
                                         }}
                                     />
                                 </div>
@@ -321,13 +303,13 @@ export const CreateBarPage = () => {
                                                     Latitude *
                                                 </FormLabel>
                                                 <FormControl>
-                                                    <Input
-                                                        {...field}
-                                                        type="number"
-                                                        step="any"
-                                                        placeholder="e.g., 40.7128"
-                                                        className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                                                    />
+                                                <Input
+                                                    {...field}
+                                                    type="number"
+                                                    step="any"
+                                                    placeholder="e.g., 40.7128"
+                                                    className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
+                                                />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -343,13 +325,13 @@ export const CreateBarPage = () => {
                                                     Longitude *
                                                 </FormLabel>
                                                 <FormControl>
-                                                    <Input
-                                                        {...field}
-                                                        type="number"
-                                                        step="any"
-                                                        placeholder="e.g., -74.0060"
-                                                        className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                                                    />
+                                                <Input
+                                                    {...field}
+                                                    type="number"
+                                                    step="any"
+                                                    placeholder="e.g., -74.0060"
+                                                    className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
+                                                />
                                                 </FormControl>
                                                 <FormMessage />
                                             </FormItem>
@@ -389,7 +371,12 @@ export const CreateBarPage = () => {
                                     </Button>
                                     <Button
                                         type="submit"
-                                        disabled={loading}
+                                        disabled={
+                                            loading ||
+                                            !Number.isFinite(form.watch('latitude')) ||
+                                            !Number.isFinite(form.watch('longitude')) ||
+                                            (form.watch('latitude') === 0 && form.watch('longitude') === 0)
+                                        }
                                         className="bg-barTrekker-orange hover:bg-barTrekker-orange/90"
                                     >
                                         <Save className="h-4 w-4 mr-2" />

@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Calendar, MapPin, DollarSign, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Save, Calendar, MapPin } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
 import { ImageUploadResult } from '@/core/services/imageService';
-import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
+// Coordinates are derived from selected bar; no direct importer needed here
 
 import { Button } from '@/core/components/ui/button';
 import {
@@ -26,7 +26,7 @@ import {
 } from '@/core/components/ui/form';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Textarea } from '@/core/components/ui/inputs/textarea';
-import { Select } from '@/core/components/ui/inputs/select';
+// import { Select } from '@/core/components/ui/inputs/select';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
 import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation } from '@/core/types/event';
@@ -40,13 +40,9 @@ const createEventSchema = z.object({
   description: z.string().min(1, "Description is required").min(10, "Description must be at least 10 characters"),
   price: z.string().min(1, "Price is required").refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Price must be a positive number"),
   country: z.string().min(1, "Country is required"),
-  startLocationName: z.string().min(1, "Venue is required"),
+  startLocationName: z.string().optional(),
   includedDescription: z.string().optional(),
   startTime: z.string().min(1, "Start time is required"),
-  imageURL: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  latitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid latitude"),
-  longitude: z.string().refine((val) => !isNaN(Number(val)), "Must be a valid longitude"),
-  // Bar selection
   barId: z.string().min(1, "Please select a bar"),
 });
 
@@ -57,12 +53,11 @@ export const CreateEventPage = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [bars, setBars] = useState<Bar[]>([]);
-  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
+  const [selectedBar, setSelectedBar] = useState<Bar | undefined>(undefined);
   const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
 
-  // Автоматически создать стартовую локацию из выбранного бара
   useEffect(() => {
     if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
       const startLocation: EventLocation = {
@@ -71,7 +66,7 @@ export const CreateEventPage = () => {
         address: selectedBar.address,
         coordinates: { latitude: selectedBar.coordinates.latitude, longitude: selectedBar.coordinates.longitude },
         order: 0,
-        stayDuration: 60, // Увеличиваем время для стартовой локации
+        stayDuration: 60, 
         description: `Starting location at ${selectedBar.name}`,
         barName: selectedBar.name,
         barAddress: selectedBar.address,
@@ -87,10 +82,9 @@ export const CreateEventPage = () => {
 
       setEventRoute(initialRoute);
 
-      // Автоматически включаем настройки уведомлений для pub crawl
       setNotificationSettings({
-        startReminder: 15,        // 15 минут до начала
-        locationReminders: 10,    // 10 минут до перехода
+        startReminder: 15,       
+        locationReminders: 10,   
         arrivalNotifications: true,
         departureNotifications: true,
       });
@@ -107,12 +101,16 @@ export const CreateEventPage = () => {
       startLocationName: '',
       includedDescription: '',
       startTime: '',
-      imageURL: '',
-      latitude: '',
-      longitude: '',
       barId: '',
     },
   });
+
+  // Автозаполнение названия старта именем выбранного бара
+  useEffect(() => {
+    if (selectedBar) {
+      form.setValue('startLocationName', selectedBar.name)
+    }
+  }, [selectedBar])
 
   // Load bars on component mount
   useEffect(() => {
@@ -139,18 +137,19 @@ export const CreateEventPage = () => {
         return;
       }
 
+      const primaryImage = uploadedImages[0]?.url || 'https://via.placeholder.com/400x200'
       const eventData: CreateEventData = {
         name: data.name,
         description: data.description,
         price: data.price,
         country: data.country,
-        startLocationName: data.startLocationName,
+        startLocationName: data.startLocationName || bar.name,
         includedDescription: data.includedDescription || '',
         startTime: new Date(data.startTime),
-        imageURL: data.imageURL || 'https://via.placeholder.com/400x200',
+        imageURL: primaryImage,
         startLocation: {
-          latitude: parseFloat(data.latitude),
-          longitude: parseFloat(data.longitude),
+          latitude: bar.coordinates.latitude,
+          longitude: bar.coordinates.longitude,
         },
         // Bar information from selected bar
         barName: bar.name,
@@ -160,9 +159,7 @@ export const CreateEventPage = () => {
         barPhone: bar.phone || undefined,
         barEmail: bar.email || undefined,
         barWebsite: bar.website || undefined,
-        // Images
         images: uploadedImages.map(img => img.url),
-        // Новые поля для маршрутов
         route: eventRoute,
         notificationSettings: notificationSettings,
       };
@@ -264,7 +261,7 @@ export const CreateEventPage = () => {
                             onChange={(e) => {
                               field.onChange(e.target.value);
                               const bar = bars.find(b => b.id === e.target.value);
-                              setSelectedBar(bar || null);
+                              setSelectedBar(bar);
                             }}
                             className="w-full p-3 border border-barTrekker-lightGrey rounded-md bg-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange focus:outline-none"
                           >
@@ -358,11 +355,11 @@ export const CreateEventPage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Price (USD) *
+                          Price (GBP) *
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-barTrekker-darkGrey/70 text-sm">£</span>
                             <Input
                               {...field}
                               type="number"
@@ -421,87 +418,10 @@ export const CreateEventPage = () => {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="startLocationName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Venue *
-                        </FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                            <Input
-                              {...field}
-                              placeholder="Enter venue name"
-                              className="pl-10 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* startLocationName is auto-filled from selected bar; field hidden */}
                 </div>
 
-                {/* Google Maps Importer */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Location Coordinates</h3>
-                  <GoogleMapsImporter
-                    onCoordinatesFound={(latitude, longitude) => {
-                      form.setValue('latitude', latitude.toString())
-                      form.setValue('longitude', longitude.toString())
-                    }}
-                  />
-                </div>
-
-                {/* Coordinates */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FormField
-                    control={form.control}
-                    name="latitude"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Latitude *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            step="any"
-                            placeholder="e.g., 40.7128"
-                            className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="longitude"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Longitude *
-                        </FormLabel>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            step="any"
-                            placeholder="e.g., -74.0060"
-                            className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                {/* Coordinates are derived from selected bar automatically */}
 
                 {/* Date and Time */}
                 <FormField
@@ -516,6 +436,7 @@ export const CreateEventPage = () => {
                         <Input
                           {...field}
                           type="datetime-local"
+                            lang="en-GB"
                           className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                         />
                       </FormControl>
@@ -557,28 +478,7 @@ export const CreateEventPage = () => {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="imageURL"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                        Fallback Image URL (optional)
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <ImageIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                          <Input
-                            {...field}
-                            placeholder="https://example.com/image.jpg"
-                            className="pl-10 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {/* No fallback URL field; primary image is first uploaded image */}
 
                 {/* Event Route Manager */}
                 <EventRouteManager
