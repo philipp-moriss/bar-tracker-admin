@@ -13,7 +13,6 @@ export const AdminAnalyticsPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Логируем просмотр страницы аналитики
     AnalyticsService.logPageView('Admin Analytics');
     setLoading(false);
   }, []);
@@ -31,7 +30,6 @@ export const AdminAnalyticsPage = () => {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        {/* Заголовок */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
@@ -39,7 +37,6 @@ export const AdminAnalyticsPage = () => {
           </div>
         </div>
 
-        {/* Статистические карточки */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -94,7 +91,6 @@ export const AdminAnalyticsPage = () => {
           </Card>
         </div>
 
-        {/* Графики и детальная аналитика */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
@@ -127,7 +123,6 @@ export const AdminAnalyticsPage = () => {
           </Card>
         </div>
 
-        {/* Дополнительная информация */}
         <Card>
           <CardHeader>
             <CardTitle>System Status</CardTitle>

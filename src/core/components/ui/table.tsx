@@ -3,7 +3,7 @@ import { ExternalLink } from "lucide-react"
 
 import { cn } from "@/core/lib/utils"
 
-// Компонент иконки внешней ссылки для отображения в hover и selected состояниях
+// External link icon component for display in hover and selected states
 const ExternalLinkIcon = () => (
   <ExternalLink className="h-4 w-4 text-foreground" />
 )

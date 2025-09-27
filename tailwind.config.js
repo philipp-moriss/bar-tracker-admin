@@ -54,7 +54,7 @@ module.exports = {
   				hover: '#F7F8FF',
   				selected: '#DBDEFF'
   			},
-  			// BAR TREKKER цветовая палитра
+  			// BAR TREKKER color palette
   			barTrekker: {
   				darkGrey: '#3C3D45',
   				lightGrey: '#E8E8E8',

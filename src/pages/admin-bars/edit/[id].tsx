@@ -65,7 +65,6 @@ export const EditBarPage = () => {
                 coordinates: bar.coordinates || { latitude: 0, longitude: 0 },
                 isActive: bar.isActive ?? true,
             });
-            // Инициализируем виджет загрузки текущими изображениями
             setUploadedImages((bar.images || []).map((url) => ({ url, path: '', name: url.split('/').pop() || 'image', size: 0 })));
         } catch (err) {
             console.error('Error loading bar:', err);

@@ -238,7 +238,7 @@ export const AdminSetupPage = () => {
                           <Input
                             {...field}
                             type={showPassword ? "text" : "password"}
-                            placeholder="Введите пароль"
+                            placeholder="Enter password"
                             className="pl-12 pr-12 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                           />
                           <button
@@ -273,7 +273,7 @@ export const AdminSetupPage = () => {
                           <Input
                             {...field}
                             type={showConfirmPassword ? "text" : "password"}
-                            placeholder="Подтвердите пароль"
+                            placeholder="Confirm password"
                             className="pl-12 pr-12 bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                           />
                           <button

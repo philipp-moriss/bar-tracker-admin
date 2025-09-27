@@ -1,6 +1,5 @@
 import { Timestamp } from 'firebase/firestore'
 
-// Типы для локаций в маршруте события
 export interface EventLocation {
   id: string
   name: string
@@ -9,8 +8,8 @@ export interface EventLocation {
     latitude: number
     longitude: number
   }
-  order: number // Порядок в маршруте (0, 1, 2, ...)
-  stayDuration: number // Время пребывания в минутах
+  order: number
+  stayDuration: number
   description?: string
   barName?: string
   barAddress?: string
@@ -18,19 +17,17 @@ export interface EventLocation {
   barEmail?: string
 }
 
-// Типы для маршрута события
 export interface EventRoute {
   locations: EventLocation[]
-  totalDuration: number // Общее время события в минутах
-  isActive: boolean // Активен ли маршрут
+  totalDuration: number
+  isActive: boolean
 }
 
-// Настройки уведомлений для события
 export interface EventNotificationSettings {
-  startReminder: number // За сколько минут до начала напомнить
-  locationReminders: number // За сколько минут до перехода к следующей локации
-  arrivalNotifications: boolean // Уведомления о прибытии
-  departureNotifications: boolean // Уведомления о скором отбытии
+  startReminder: number
+  locationReminders: number
+  arrivalNotifications: boolean
+  departureNotifications: boolean
 }
 
 // Event types based on mobile app structure
@@ -62,9 +59,8 @@ export interface Event {
   updatedAt?: Timestamp | Date
   // Images
   images?: string[] // URLs of uploaded images
-  // Новые поля для маршрутов
-  route?: EventRoute // Маршрут события с множественными локациями
-  notificationSettings?: EventNotificationSettings // Настройки уведомлений
+  route?: EventRoute
+  notificationSettings?: EventNotificationSettings
 }
 
 export interface CreateEventData {
@@ -90,9 +86,8 @@ export interface CreateEventData {
   barWebsite?: string
   // Images
   images?: string[] // URLs of uploaded images
-  // Новые поля для маршрутов
-  route?: EventRoute // Маршрут события с множественными локациями
-  notificationSettings?: EventNotificationSettings // Настройки уведомлений
+  route?: EventRoute
+  notificationSettings?: EventNotificationSettings
 }
 
 export interface UpdateEventData extends Partial<CreateEventData> {

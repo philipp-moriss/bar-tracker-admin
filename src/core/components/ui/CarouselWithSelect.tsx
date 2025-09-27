@@ -25,7 +25,6 @@ export const CarouselWithSelect: React.FC<CarouselWithSelectProps> = ({ options,
     }
   };
 
-  // Выбранные картинки для отображения сверху
   const selectedOptions = options.filter(opt => value.includes(opt.value));
 
   return (
@@ -85,7 +84,7 @@ export const CarouselWithSelect: React.FC<CarouselWithSelectProps> = ({ options,
             </SwiperSlide>
           ))}
         </Swiper>
-        {/* Кастомные стрелки Swiper */}
+        {/* Custom Swiper arrows */}
         <style>{`
           .swiper-button-next, .swiper-button-prev {
             color: #6366f1;

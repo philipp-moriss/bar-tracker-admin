@@ -2,34 +2,34 @@ import { TFunction } from 'i18next';
 import * as z from 'zod';
 
 /**
- * Общие схемы валидации для переиспользования
+ * Common validation schemas for reuse
  */
 export const commonValidations = {
   /**
-   * Обязательное строковое поле
+   * Required string field
    */
   requiredString: (t: (key: string) => string) => 
     z.string().min(1, t('common.required')),
   
   /**
-   * Email валидация
+   * Email validation
    */
   email: (t: (key: string) => string) => 
     z.string().email('Invalid email format').min(1, t('common.required')),
   
   /**
-   * Пароль с минимальной длиной
+   * Password with minimum length
    */
   password: (minLength: number = 6) => 
     z.string().min(minLength, `Password must be at least ${minLength} characters`),
   
   /**
-   * Опциональная строка
+   * Optional string
    */
   optionalString: () => z.string().optional().default(''),
   
   /**
-   * Файл с ограничением размера
+   * File with size limit
    */
   file: (maxSizeMB: number = 1) => {
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
@@ -45,12 +45,12 @@ export const commonValidations = {
   },
   
   /**
-   * Опциональный файл
+   * Optional file
    */
   optionalFile: (maxSizeMB: number = 1) => {
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     return z.custom<File | null>((file) => {
-      if (!file) return true; // Опциональный
+      if (!file) return true;
       if (!(file instanceof File)) return false;
       return file.size <= maxSizeBytes;
     }, {
@@ -60,7 +60,7 @@ export const commonValidations = {
 };
 
 /**
- * Утилита для создания схемы формы с общими паттернами
+ * Utility for creating form schema with common patterns
  */
 export const createFormSchema = <T extends Record<string, z.ZodTypeAny>>(
   fields: T,
@@ -70,11 +70,11 @@ export const createFormSchema = <T extends Record<string, z.ZodTypeAny>>(
 };
 
 /**
- * Стандартные обработчики ошибок для форм
+ * Standard error handlers for forms
  */
 export const formErrorHandlers = {
   /**
-   * Обработка API ошибок
+   * API error handling
    */
   handleApiError: (
     error: unknown,
@@ -104,7 +104,7 @@ export const formErrorHandlers = {
   },
 
   /**
-   * Обработка ошибок размера файла
+   * File size error handling
    */
   handleFileSizeError: (
     error: unknown,
@@ -120,7 +120,6 @@ export const formErrorHandlers = {
       message?: string 
     };
     
-    // Проверяем на ошибку размера файла
     if (
       apiError?.response?.status === 413 || 
       (typeof apiError?.response?.data?.message === 'string' && 
@@ -136,7 +135,7 @@ export const formErrorHandlers = {
 };
 
 /**
- * Стандартные конфигурации для форм
+ * Standard form configurations
  */
 export const standardFormConfig = {
   mode: 'onChange' as const,
@@ -144,7 +143,7 @@ export const standardFormConfig = {
 };
 
 /**
- * Стандартные значения по умолчанию для разных типов форм
+ * Standard default values for different form types
  */
 export const defaultFormValues = {
   auth: {
@@ -172,7 +171,7 @@ export const defaultFormValues = {
 };
 
 /**
- * Типы для стандартных форм
+ * Types for standard forms
  */
 export type LoginFormData = typeof defaultFormValues.auth.login;
 export type RegisterFormData = typeof defaultFormValues.auth.register;

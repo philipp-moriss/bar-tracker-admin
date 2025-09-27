@@ -14,8 +14,8 @@ import { Toaster } from '@/core/components/ui/toast/sonner'
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            staleTime: 1 * 60 * 1000, // 1 минута по умолчанию
-            gcTime: 3 * 60 * 1000, // 3 минуты по умолчанию
+            staleTime: 1 * 60 * 1000,
+            gcTime: 3 * 60 * 1000,
             refetchOnWindowFocus: false,
             retry: 1,
         },

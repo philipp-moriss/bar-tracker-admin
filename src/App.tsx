@@ -5,7 +5,7 @@ import { useAuthInit } from '@/core/hooks/useAuthInit'
 
 function App() {
     useWindowHeight();
-    useAuthInit(); // Инициализируем аутентификацию
+    useAuthInit();
 
     return (
         <>

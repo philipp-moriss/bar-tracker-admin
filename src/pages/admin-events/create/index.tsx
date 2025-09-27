@@ -105,7 +105,6 @@ export const CreateEventPage = () => {
     },
   });
 
-  // Автозаполнение названия старта именем выбранного бара
   useEffect(() => {
     if (selectedBar) {
       form.setValue('startLocationName', selectedBar.name)

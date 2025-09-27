@@ -23,7 +23,7 @@ import {
 } from '@/core/types/ticket'
 
 export class TicketService {
-  private readonly ticketsCollection = collection(db, 'ticketGroups') // Билеты хранятся в ticketGroups
+  private readonly ticketsCollection = collection(db, 'ticketGroups')
   private readonly ticketGroupsCollection = collection(db, 'ticketGroups')
   private readonly purchasesCollection = collection(db, 'purchases')
 
@@ -32,13 +32,11 @@ export class TicketService {
    */
   async getTickets(filters?: TicketFilters): Promise<Ticket[]> {
     try {
-      // Читаем из двух коллекций: ticketGroups и tickets
       const [ticketGroupsSnapshot, ticketsSnapshot] = await Promise.all([
         getDocs(query(this.ticketGroupsCollection, orderBy('createdAt', 'desc'))),
         getDocs(query(collection(db, 'tickets'), orderBy('createdAt', 'desc')))
       ]);
 
-      // Создаем мапу данных из tickets для быстрого поиска по paymentId
       const ticketsMap = new Map();
       ticketsSnapshot.docs.forEach((doc) => {
         const data = doc.data();
@@ -54,15 +52,13 @@ export class TicketService {
         }
       });
 
-      // Обрабатываем ticketGroups и объединяем с данными из tickets
       const ticketGroups = ticketGroupsSnapshot.docs.map((doc) => {
         const data = doc.data();
         const ticketData = ticketsMap.get(data.paymentId);
         
-        // Если есть данные в tickets, используем их, иначе данные из ticketGroups
         if (ticketData) {
           return {
-            id: ticketData.id, // Используем ID из tickets
+            id: ticketData.id,
             eventId: ticketData.eventId || '',
             userId: ticketData.userId || '',
             inviteCode: ticketData.inviteCode || '',
@@ -87,7 +83,6 @@ export class TicketService {
             updatedAt: ticketData.updatedAt,
           } as Ticket;
         } else {
-          // Fallback на данные из ticketGroups
           return {
             id: doc.id,
             eventId: data.eventId || '',
@@ -97,7 +92,7 @@ export class TicketService {
             status: data.isScanned ? TicketStatus.SCANNED : TicketStatus.ACTIVE,
             purchaseDate: data.createdAt?.toDate() || new Date(),
             usedDate: data.scannedAt?.toDate() || undefined,
-            price: 0, // Нет доступа к purchases
+            price: 0,
             currency: 'GBP',
             paymentIntentId: data.paymentId || '',
             paymentId: data.paymentId || '',
@@ -112,7 +107,6 @@ export class TicketService {
         }
       });
 
-      // Добавляем в итог также те документы из tickets, у которых нет пары в ticketGroups (по paymentId)
       const ticketGroupPaymentIds = new Set(
         ticketGroupsSnapshot.docs.map((d) => (d.data() as any).paymentId).filter(Boolean)
       );
@@ -152,10 +146,8 @@ export class TicketService {
           } as Ticket;
         });
 
-      // Убираем дедупликацию - показываем все билеты (ticketGroups + tickets без пары)
       let allTickets = [...ticketGroups, ...orphanTickets];
 
-      // Применяем фильтры
       if (filters?.status) {
         allTickets = allTickets.filter(ticket => ticket.status === filters.status);
       }
@@ -176,7 +168,6 @@ export class TicketService {
         allTickets = allTickets.filter(ticket => ticket.purchaseDate <= filters.dateTo!);
       }
 
-      // Client-side filtering for search and invite code
       if (filters?.search) {
         const searchLower = filters.search.toLowerCase()
         allTickets = allTickets.filter(ticket =>
@@ -211,7 +202,6 @@ export class TicketService {
       if (docSnap.exists()) {
         const data = docSnap.data()
 
-        // Адаптируем данные из ticketGroups к интерфейсу Ticket
         return {
           id: docSnap.id,
           eventId: data.eventId || '',
@@ -299,19 +289,16 @@ export class TicketService {
   async updateTicketStatus(id: string, status: TicketStatus, usedDate?: Date): Promise<void> {
     try {
       
-      // Определяем, в какой коллекции находится билет
       let docRef;
       let updateData: any = {
         updatedAt: Timestamp.fromDate(new Date()),
       };
 
-      // Сначала пробуем найти в ticketGroups
       try {
         docRef = doc(this.ticketGroupsCollection, id);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          // Билет найден в ticketGroups
           if (status === TicketStatus.USED || status === TicketStatus.SCANNED) {
             updateData.isScanned = true;
             if (usedDate) {
@@ -323,7 +310,6 @@ export class TicketService {
 
           await updateDoc(docRef, updateData);
           
-          // Также обновляем соответствующий документ в tickets по paymentId
           const data = docSnap.data();
           if (data.paymentId) {
             try {
@@ -357,13 +343,11 @@ export class TicketService {
         
       }
 
-      // Если не найден в ticketGroups, пробуем в tickets
       try {
         docRef = doc(collection(db, 'tickets'), id);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          // Билет найден в tickets - адаптируем статус
           if (status === TicketStatus.USED || status === TicketStatus.SCANNED) {
             updateData.status = 'scanned';
             if (usedDate) {
@@ -377,14 +361,12 @@ export class TicketService {
             updateData.status = status.toLowerCase();
           }
 
-          // Пытаемся обновить tickets; если нет прав — продолжаем без ошибки
           try {
             await updateDoc(docRef, updateData);
           } catch (e) {
             
           }
           
-          // Также обновляем соответствующий документ в ticketGroups по paymentId
           const data = docSnap.data();
           if (data.paymentId) {
             try {
@@ -418,7 +400,6 @@ export class TicketService {
         
       }
 
-      // Если билет не найден ни в одной коллекции
       throw new Error(`Ticket with ID ${id} not found in any collection`);
 
     } catch (error) {
@@ -460,7 +441,6 @@ export class TicketService {
    */
   async deleteTicket(id: string): Promise<void> {
     try {
-      // Сначала пробуем найти и удалить из ticketGroups
       try {
         const docRef = doc(this.ticketGroupsCollection, id);
         const docSnap = await getDoc(docRef);
@@ -472,7 +452,6 @@ export class TicketService {
       } catch (error) {
       }
 
-      // Если не найден в ticketGroups, пробуем в tickets
       try {
         const docRef = doc(collection(db, 'tickets'), id);
         const docSnap = await getDoc(docRef);
@@ -484,7 +463,6 @@ export class TicketService {
       } catch (error) {
       }
 
-      // Если билет не найден ни в одной коллекции
       throw new Error(`Ticket with ID ${id} not found in any collection`);
 
     } catch (error) {

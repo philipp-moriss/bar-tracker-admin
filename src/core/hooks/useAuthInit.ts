@@ -2,16 +2,14 @@ import { useEffect } from 'react'
 import { useAuthStore } from '@/core/stores/authStore'
 
 /**
- * Хук для инициализации аутентификации при запуске приложения
+ * Hook for authentication initialization on app startup
  */
 export const useAuthInit = () => {
   const { initializeAuth } = useAuthStore()
 
   useEffect(() => {
-    // Инициализируем аутентификацию
     const unsubscribe = initializeAuth()
 
-    // Cleanup функция для отписки от слушателя
     return () => {
       if (unsubscribe) {
         unsubscribe()

@@ -1,6 +1,5 @@
 import { Timestamp } from 'firebase/firestore'
 
-// Ticket types based on mobile app structure
 export interface Ticket {
   id?: string
   eventId: string
@@ -13,8 +12,8 @@ export interface Ticket {
   price: number
   currency: string
   paymentIntentId?: string
-  paymentId?: string // Из ticketGroups
-  mainTicketId?: string // Из ticketGroups
+  paymentId?: string
+  mainTicketId?: string
   groupName?: string
   eventName?: string
   eventDate?: Timestamp | Date
