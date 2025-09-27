@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  base: process.env.NODE_ENV === 'production' ? '/admin/' : '/',
+  // base: process.env.NODE_ENV === 'production' ? '/admin/' : '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -12,6 +12,7 @@ export default defineConfig({
       '@components': path.resolve(__dirname, './src/core/components'),
     },
   },
+  base: '/',
   server: {
     hmr: {
       overlay: false
