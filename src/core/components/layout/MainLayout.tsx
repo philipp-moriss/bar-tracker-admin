@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 
 export const MainLayout = () => {
 
-    useDocumentTitle("Survey Answer")
+    useDocumentTitle("BarTrekker Admin")
 
     return (
         <div className="min-h-screen w-screen flex items-center justify-center bg-[#1C1F2E] dark:bg-background">
