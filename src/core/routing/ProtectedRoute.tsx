@@ -7,7 +7,6 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     const { user, isAuthenticated, sessionExpired } = useAuthStore()
     const location = useLocation()
 
-    // Если сессия истекла, показываем модальное окно
     if (sessionExpired) {
         return (
             <>
@@ -17,12 +16,10 @@ export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         )
     }
 
-    // Если пользователь не аутентифицирован, перенаправляем на страницу входа
     if (!isAuthenticated || !user) {
         return <Navigate to={ROUTES.ADMIN.LOGIN} state={{ from: location }} replace />
     }
 
-    // Проверяем, что пользователь является администратором
     if (!user.isAdmin) {
         return <Navigate to={ROUTES.ADMIN.LOGIN} state={{ from: location }} replace />
     }

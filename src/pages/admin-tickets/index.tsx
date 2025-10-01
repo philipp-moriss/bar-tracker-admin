@@ -367,7 +367,6 @@ export const AdminTicketsPage = () => {
       [TicketStatus.EXPIRED]: { label: 'Expired', variant: 'outline' as const, icon: XCircle },
     };
 
-    // Проверяем, что status существует и есть в конфиге
     if (!status || !statusConfig[status]) {
       const defaultConfig = { label: 'Unknown', variant: 'outline' as const, icon: Clock };
       const Icon = defaultConfig.icon;

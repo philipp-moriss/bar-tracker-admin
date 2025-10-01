@@ -11,10 +11,8 @@ import {
 import { firebaseApp } from '@/modules/firebase/config'
 import { AnalyticsService } from './analyticsService'
 
-// Инициализация Firebase Auth
 const auth = getAuth(firebaseApp)
 
-// Данные единственного админа из переменных окружения
 const ADMIN_CREDENTIALS = {
   email: ENV_CONFIG.ADMIN.EMAIL,
   password: ENV_CONFIG.ADMIN.PASSWORD,
@@ -35,11 +33,10 @@ export interface LoginResponse {
 
 export class AuthService {
   /**
-   * Вход в систему через Firebase Auth
+   * Login to system via Firebase Auth
    */
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     try {
-      // Проверяем, что это админские учетные данные
       if (
         credentials.email !== ADMIN_CREDENTIALS.email ||
         credentials.password !== ADMIN_CREDENTIALS.password
@@ -50,7 +47,6 @@ export class AuthService {
         }
       }
 
-      // Входим через Firebase
       const userCredential = await signInWithEmailAndPassword(
         auth,
         credentials.email,
@@ -65,7 +61,6 @@ export class AuthService {
         isAdmin: true
       }
 
-      // Логируем успешный вход
       AnalyticsService.logAdminLogin()
 
       return {
@@ -87,7 +82,6 @@ export class AuthService {
         errorMessage = 'Too many login attempts. Please try again later'
       }
 
-      // Логируем ошибку аутентификации
       AnalyticsService.logAuthError(error.code || 'unknown')
 
       return {
@@ -98,12 +92,11 @@ export class AuthService {
   }
 
   /**
-   * Выход из системы через Firebase
+   * Logout from system via Firebase
    */
   async logout(): Promise<void> {
     try {
       await signOut(auth)
-      // Логируем выход
       AnalyticsService.logAdminLogout()
     } catch (error) {
       console.error('Firebase logout error:', error)
@@ -112,34 +105,30 @@ export class AuthService {
   }
 
   /**
-   * Проверяет, существует ли уже админ в системе
+   * Checks if admin already exists in the system
    */
   async checkAdminExists(): Promise<boolean> {
     try {
-      // Пытаемся войти с админскими данными
       await signInWithEmailAndPassword(
         auth,
         ADMIN_CREDENTIALS.email,
         ADMIN_CREDENTIALS.password
       )
-      // Если успешно, выходим
       await signOut(auth)
       return true
     } catch (error: any) {
       if (error.code === 'auth/user-not-found') {
         return false
       }
-      // Другие ошибки (например, неверный пароль) означают, что пользователь существует
       return true
     }
   }
 
   /**
-   * Создает единственного админа через Firebase
+   * Creates single admin via Firebase
    */
   async createAdmin(): Promise<{ success: boolean; message: string }> {
     try {
-      // Проверяем, существует ли уже админ
       const exists = await this.checkAdminExists()
       if (exists) {
         return {
@@ -148,7 +137,6 @@ export class AuthService {
         }
       }
 
-      // Создаем админа через Firebase
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         ADMIN_CREDENTIALS.email,
@@ -157,7 +145,6 @@ export class AuthService {
 
       console.log('Admin created successfully:', userCredential.user.uid)
 
-      // Логируем создание администратора
       AnalyticsService.logAdminCreated()
 
       return {
@@ -185,11 +172,10 @@ export class AuthService {
   }
 
   /**
-   * Получает данные админа по ID
+   * Gets admin data by ID
    */
   async getAdminById(id: string): Promise<AdminUser | null> {
     try {
-      // В Firebase мы можем получить текущего пользователя
       const currentUser = auth.currentUser
       if (currentUser && currentUser.uid === id) {
         return {
@@ -207,7 +193,7 @@ export class AuthService {
   }
 
   /**
-   * Слушает изменения состояния аутентификации
+   * Listens to authentication state changes
    */
   onAuthStateChanged(callback: (user: AdminUser | null) => void): () => void {
     return onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
@@ -226,5 +212,4 @@ export class AuthService {
   }
 }
 
-// Экспортируем единственный экземпляр сервиса
 export const authService = new AuthService()

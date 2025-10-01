@@ -54,7 +54,6 @@ export const LoginPage = () => {
     },
   });
 
-  // Логируем посещение страницы входа
   useEffect(() => {
     AnalyticsService.logPageView('Admin Login Page')
   }, []);
@@ -68,10 +67,8 @@ export const LoginPage = () => {
       });
 
       if (response.success && response.user) {
-        // Сохраняем пользователя в store
         login(response.user);
         
-        // Перенаправляем на главную страницу админки
         navigate("/admin");
       } else {
         form.setError("root", {

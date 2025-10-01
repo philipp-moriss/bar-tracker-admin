@@ -12,10 +12,8 @@ export const LoadingMessage = () => {
     const gifRef = useRef<HTMLImageElement>(null)
     const textRef = useRef<HTMLSpanElement>(null)
 
-    // Получаем массив фраз из i18n
     const phrases: string[] = t('survey.loading.phrases', { returnObjects: true }) as string[];
 
-    // Установка языка формы при загрузке
     useEffect(() => {
         if (form?.language) {
             i18n.changeLanguage(form.language);
@@ -24,17 +22,14 @@ export const LoadingMessage = () => {
 
     const isRTL = form?.language === 'ar' || form?.language === 'he';
 
-    // Синхронизация с гифкой
     useEffect(() => {
         const animate = () => {
             if (textRef.current) {
-                // Принудительно включаем GPU и вызываем reflow
                 textRef.current.style.transform = 'translate3d(0,0,0)';
             }
             
             setFade(false);
             
-            // Используем requestAnimationFrame для лучшей синхронизации
             requestAnimationFrame(() => {
                 setTimeout(() => {
                     setPhraseIdx((prev) => (prev + 1) % phrases.length);
@@ -43,13 +38,10 @@ export const LoadingMessage = () => {
             });
         };
 
-        // Запускаем анимацию каждые 2.5 секунды
         const interval = setInterval(animate, 2500);
         
-        // Запускаем первую анимацию с задержкой для стабильности
         const initialTimeout = setTimeout(() => {
             if (textRef.current) {
-                // Принудительная инициализация
                 textRef.current.style.opacity = '1';
             }
             animate();

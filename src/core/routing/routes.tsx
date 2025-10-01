@@ -1,4 +1,3 @@
-import { HomePage } from "@/pages/home";
 import { LoginPage } from "@/pages/login";
 import { AdminSetupPage } from "@/pages/admin-setup";
 import { AdminEventsPage } from "@/pages/admin-events";
@@ -21,7 +20,7 @@ import { AdminSettingsPage } from "@/pages/admin-settings";
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <HomePage />,
+    element: <LoginPage />,
   },
   {
     path: "login",

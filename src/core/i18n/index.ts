@@ -21,7 +21,7 @@ i18n
     }
   });
 
-// Функция для принудительной перезагрузки переводов
+// Function for forced translation reload
 export const reloadTranslations = () => {
   i18n.reloadResources();
 };

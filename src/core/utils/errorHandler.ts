@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 /**
- * Обрабатывает ошибки API и возвращает сообщение об ошибке
+ * Handles API errors and returns error message
  */
 export const handleApiError = (error: unknown, fallbackMessage: string): string => {
   if (axios.isAxiosError(error)) {
@@ -11,14 +11,14 @@ export const handleApiError = (error: unknown, fallbackMessage: string): string 
 };
 
 /**
- * Проверяет, является ли ошибка Axios ошибкой
+ * Checks if error is Axios error
  */
 export const isAxiosError = (error: unknown): boolean => {
   return axios.isAxiosError(error);
 };
 
 /**
- * Получает статус код ошибки
+ * Gets error status code
  */
 export const getErrorStatus = (error: unknown): number | undefined => {
   if (axios.isAxiosError(error)) {
@@ -28,7 +28,7 @@ export const getErrorStatus = (error: unknown): number | undefined => {
 };
 
 /**
- * Получает данные ответа с ошибкой
+ * Gets response data with error
  */
 export const getErrorData = (error: unknown): unknown => {
   if (axios.isAxiosError(error)) {

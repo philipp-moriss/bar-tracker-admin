@@ -13,8 +13,8 @@ interface EventRouteManagerProps {
     notificationSettings?: EventNotificationSettings;
     onRouteChange: (route: EventRoute | undefined) => void;
     onNotificationSettingsChange: (settings: EventNotificationSettings | undefined) => void;
-    bars?: Bar[]; // Список доступных баров для выбора локаций
-    startBar?: Bar; // Стартовый бар (будет автоматически добавлен как первая локация)
+    bars?: Bar[];
+    startBar?: Bar;
 }
 
 export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
@@ -28,7 +28,6 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
     const [showRouteBuilder, setShowRouteBuilder] = useState(false);
     const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
-    // Создать стартовую локацию из выбранного бара
     const createStartLocationFromBar = (bar: Bar): EventLocation => {
         return {
             id: `start_location_${bar.id}`,
@@ -36,7 +35,7 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
             address: bar.address,
             coordinates: { latitude: bar.coordinates.latitude, longitude: bar.coordinates.longitude },
             order: 0,
-            stayDuration: 60, // 60 минут по умолчанию для стартовой локации
+            stayDuration: 60,
             description: `Starting location at ${bar.name}`,
             barName: bar.name,
             barAddress: bar.address,
@@ -45,7 +44,6 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
         };
     };
 
-    // Добавить новую локацию в маршрут (выбираем из существующих баров)
     const addLocationFromBar = (selectedBar: Bar) => {
         const newLocation: EventLocation = {
             id: `location_${selectedBar.id}_${Date.now()}`,
@@ -53,7 +51,7 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
             address: selectedBar.address,
             coordinates: { latitude: selectedBar.coordinates.latitude, longitude: selectedBar.coordinates.longitude },
             order: route?.locations.length || 0,
-            stayDuration: 75, // 75 минут по умолчанию для промежуточных локаций
+            stayDuration: 75,
             description: `Visit to ${selectedBar.name}`,
             barName: selectedBar.name,
             barAddress: selectedBar.address,
@@ -70,7 +68,6 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
         onRouteChange(updatedRoute);
     };
 
-    // Добавить пустую локацию (для кастомных локаций)
     const addCustomLocation = () => {
         const newLocation: EventLocation = {
             id: `custom_location_${Date.now()}`,
@@ -91,17 +88,14 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
         onRouteChange(updatedRoute);
     };
 
-    // Удалить локацию из маршрута
     const removeLocation = (locationId: string) => {
         if (!route) return;
 
         const updatedLocations = route.locations.filter(loc => loc.id !== locationId);
         const removedLocation = route.locations.find(loc => loc.id === locationId);
 
-        // Пересчитать общую продолжительность
         const newTotalDuration = updatedLocations.reduce((total, loc) => total + loc.stayDuration, 0);
 
-        // Переназначить порядок локаций
         const reorderedLocations = updatedLocations.map((loc, index) => ({
             ...loc,
             order: index,
@@ -118,7 +112,6 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
         }
     };
 
-    // Обновить локацию
     const updateLocation = (locationId: string, updates: Partial<EventLocation>) => {
         if (!route) return;
 
@@ -129,7 +122,6 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
             return loc;
         });
 
-        // Пересчитать общую продолжительность
         const newTotalDuration = updatedLocations.reduce((total, loc) => total + loc.stayDuration, 0);
 
         onRouteChange({
@@ -139,18 +131,16 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
         });
     };
 
-    // Обновить координаты локации
     const updateLocationCoordinates = (locationId: string, latitude: number, longitude: number) => {
         updateLocation(locationId, {
             coordinates: { latitude, longitude },
         });
     };
 
-    // Обновить настройки уведомлений
     const updateNotificationSettings = (updates: Partial<EventNotificationSettings>) => {
         const updatedSettings: EventNotificationSettings = {
-            startReminder: 15, // 15 минут по умолчанию
-            locationReminders: 5, // 5 минут по умолчанию
+            startReminder: 15,
+            locationReminders: 5,
             arrivalNotifications: true,
             departureNotifications: true,
             ...notificationSettings,

@@ -51,7 +51,6 @@ export const useAuthStore = create<AuthState>()(
             sessionExpired: false,
             isLoading: false,
           })
-          // Очищаем localStorage
           localStorage.removeItem('auth-storage')
         }
       },
@@ -72,7 +71,6 @@ export const useAuthStore = create<AuthState>()(
       initializeAuth: () => {
         set({ isLoading: true })
         
-        // Слушаем изменения состояния аутентификации Firebase
         const unsubscribe = authService.onAuthStateChanged((user) => {
           if (user) {
             set({
@@ -91,7 +89,6 @@ export const useAuthStore = create<AuthState>()(
           }
         })
 
-        // Возвращаем функцию для отписки (можно использовать в useEffect cleanup)
         return unsubscribe
       },
     }),

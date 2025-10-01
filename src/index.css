@@ -85,7 +85,7 @@
 }
 
 @layer components {
-  /* Анимация для строк таблицы */
+  /* Table row animation */
   .table-row-animate {
     transform-origin: center;
     will-change: transform, background-color, box-shadow;

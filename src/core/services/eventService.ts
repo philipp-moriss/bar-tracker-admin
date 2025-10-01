@@ -62,7 +62,7 @@ const eventsCollection = collection(db, 'events')
         })
       }
 
-      // Client-side sorting (избегаем композитных индексов в Firestore)
+      // Client-side sorting
       if (filters?.sortBy) {
         const dir = filters.sortDir === 'asc' ? 1 : -1
         const field = filters.sortBy

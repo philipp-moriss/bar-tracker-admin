@@ -8,7 +8,7 @@ interface FileInputProps {
     fileName?: string;
 }
 
-// Вспомогательная функция для извлечения имени файла
+// Helper function for extracting file name
 function getDisplayFileName(fileName?: string) {
     if (!fileName) return undefined;
     if (fileName.length <= 16) return fileName;
