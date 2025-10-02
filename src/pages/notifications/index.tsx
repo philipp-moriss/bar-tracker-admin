@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/modules/firebase/config';
-import { collection, getDocs, query, orderBy, doc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, doc, writeBatch, addDoc, Timestamp } from 'firebase/firestore';
 import { Label } from '@/core/components/ui/label';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Button } from '@/core/components/ui/button';
@@ -39,6 +39,7 @@ export default function NotificationsPage() {
   const [history, setHistory] = useState<NotificationHistory[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const isEventValid = useMemo(() => form.title.trim().length > 0 && form.body.trim().length > 0 && form.eventId.length > 0, [form]);
 
 
@@ -51,6 +52,8 @@ export default function NotificationsPage() {
         toastManager.error('Provide title, body and select event');
         return;
       }
+      
+      setIsSending(true);
       
       const response = await fetch('https://us-central1-react-native-bartrekker.cloudfunctions.net/sendEventNotification', {
         method: 'POST',
@@ -72,22 +75,23 @@ export default function NotificationsPage() {
 
       const result = await response.json();
       
-      // Save notification to history
-      await fetch('https://us-central1-react-native-bartrekker.cloudfunctions.net/saveNotificationHistory', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          eventId: form.eventId,
-          title: form.title,
-          body: form.body,
-          mapUrl: form.mapUrl || undefined,
-          sent: result.sent || 0,
-          totalUsers: result.totalUsers || 0,
-          sentAt: new Date().toISOString()
-        })
-      });
+      // Save notification to history directly in Firestore
+      const historyData: any = {
+        eventId: form.eventId,
+        title: form.title,
+        body: form.body,
+        sent: result.sent || 0,
+        totalUsers: result.totalUsers || 0,
+        sentAt: Timestamp.now(),
+        createdAt: Timestamp.now()
+      };
+      
+      // Only add mapUrl if it has a value
+      if (form.mapUrl) {
+        historyData.mapUrl = form.mapUrl;
+      }
+      
+      await addDoc(collection(db, 'notificationHistory'), historyData);
       
       toastManager.success(`Sent to ${result.sent ?? 0} users with primary tickets`);
       
@@ -101,6 +105,8 @@ export default function NotificationsPage() {
       console.error(e);
       toastManager.error('Send failed: ' + (e instanceof Error ? e.message : 'Unknown error'));
       // Don't close modal on error so user can retry
+    } finally {
+      setIsSending(false);
     }
   }
 
@@ -126,7 +132,7 @@ export default function NotificationsPage() {
       setHistory(historyData);
     } catch (error) {
       console.error('Error loading notification history:', error);
-      toastManager.error('Failed to load notification history');
+      setHistory([]);
     }
   }
 
@@ -141,10 +147,10 @@ export default function NotificationsPage() {
   async function clearHistory() {
     try {
       // Delete all notifications in batches
-      const batch = writeBatch(db);
-      const batchSize = 500; // Firestore batch limit
+      const batchSize = 500; 
       
       for (let i = 0; i < history.length; i += batchSize) {
+        const batch = writeBatch(db); 
         const batchDocs = history.slice(i, i + batchSize);
         batchDocs.forEach(item => {
           batch.delete(doc(db, 'notificationHistory', item.id));
@@ -173,7 +179,10 @@ export default function NotificationsPage() {
           <Button onClick={() => setCreateOpen(true)}>Create Push</Button>
         </div>
 
-        <Modal open={createOpen} onOpenChange={setCreateOpen} title="Create Push Notification">
+        <Modal open={createOpen} onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) setIsSending(false);
+        }} title="Create Push Notification">
           <div className="space-y-6 p-4 max-h-[80vh] overflow-y-auto">
             {/* Common Fields */}
             <div className="space-y-4">
@@ -246,11 +255,18 @@ export default function NotificationsPage() {
                 <div className="flex justify-end pt-2">
                   <Button 
                     variant="default" 
-                    disabled={!isEventValid} 
+                    disabled={!isEventValid || isSending} 
                     onClick={sendEventNotification}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    📤 Send to Event Users
+                    {isSending ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        <span>Sending...</span>
+                      </div>
+                    ) : (
+                      <>📤 Send to Event Users</>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -312,22 +328,21 @@ export default function NotificationsPage() {
         </Card>
 
         {/* Clear History Confirmation Modal */}
-        <Modal open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
-          <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900">Clear Notification History</h3>
+        <Modal open={clearConfirmOpen} onOpenChange={setClearConfirmOpen} title="Clear Notification History">
+          <div className="p-4">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
               </div>
-              
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to clear all <span className="font-semibold text-red-600">{history.length}</span> notifications from history? 
-                This action cannot be undone.
-              </p>
+              <p className="text-gray-700">Are you sure?</p>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              This will clear all <span className="font-semibold text-red-600">{history.length}</span> notifications from history. 
+              This action cannot be undone.
+            </p>
               
               <div className="flex space-x-3 justify-end">
                 <Button 
@@ -343,7 +358,6 @@ export default function NotificationsPage() {
                   Clear History
                 </Button>
               </div>
-            </div>
           </div>
         </Modal>
 
