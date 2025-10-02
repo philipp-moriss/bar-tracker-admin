@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Eye, CheckCircle, XCircle, Clock, DollarSign, Calendar, MapPin, User, Download, BarChart3, History, Trash2, RotateCcw } from 'lucide-react';
+import { Eye, CheckCircle, XCircle, Clock, DollarSign, Calendar, MapPin, User, Download, BarChart3, History, Trash2, RotateCcw } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { ConfirmModal } from '@/core/components/ui/modals/ConfirmModal';
 import { DeleteConfirmModal } from '@/core/components/ui/modals/DeleteConfirmModal';
@@ -14,6 +14,8 @@ import {
   CardContent,
 } from '@/core/components/ui/card';
 import { Input } from '@/core/components/ui/inputs/input';
+import { SearchInput } from '@/core/components/ui/inputs/SearchInput';
+import { FilterSelect } from '@/core/components/ui/inputs/FilterSelect';
 import {
   Table,
   TableBody,
@@ -27,13 +29,22 @@ import { ticketService } from '@/core/services/ticketService';
 import { Ticket, TicketStatus, TicketFilters, TicketStats } from '@/core/types/ticket';
 import { AnalyticsService } from '@/core/services/analyticsService';
 
+// Опции для фильтра статусов
+const statusOptions = [
+  { value: 'all', label: 'All Status' },
+  { value: TicketStatus.ACTIVE, label: 'Active' },
+  { value: TicketStatus.USED, label: 'Used' },
+  { value: TicketStatus.SCANNED, label: 'Scanned' },
+  { value: TicketStatus.CANCELLED, label: 'Cancelled' },
+  { value: TicketStatus.EXPIRED, label: 'Expired' }
+];
+
 export const AdminTicketsPage = () => {
   const navigate = useNavigate();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [ticketStats, setTicketStats] = useState<TicketStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [inviteCodeSearch, setInviteCodeSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TicketStatus | ''>('');
   const [error, setError] = useState<string | null>(null);
   const [selectedTickets, setSelectedTickets] = useState<string[]>([]);
@@ -85,7 +96,6 @@ export const AdminTicketsPage = () => {
 
       const filters: TicketFilters = {
         search: searchTerm || undefined,
-        inviteCode: inviteCodeSearch || undefined,
         status: statusFilter || undefined,
       };
 
@@ -114,7 +124,7 @@ export const AdminTicketsPage = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, inviteCodeSearch, statusFilter]);
+  }, [searchTerm, statusFilter]);
 
   const handleViewTicket = (ticketId: string) => {
     navigate(`/admin/tickets/${ticketId}`);
@@ -617,42 +627,21 @@ export const AdminTicketsPage = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                  <Input
-                    placeholder="Search tickets..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <SearchInput
+                  placeholder="Search by ticket ID, invite code, event name, or user..."
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                />
               </div>
-              <div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                  <Input
-                    placeholder="Search by invite code..."
-                    value={inviteCodeSearch}
-                    onChange={(e) => setInviteCodeSearch(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <div>
-                <select
+              <div className="md:w-48">
+                <FilterSelect
+                  placeholder="All Status"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as TicketStatus | '')}
-                  className="w-full px-3 py-2 border border-barTrekker-lightGrey rounded-md focus:outline-none focus:ring-2 focus:ring-barTrekker-orange"
-                >
-                  <option value="">All Status</option>
-                  <option value={TicketStatus.ACTIVE}>Active</option>
-                  <option value={TicketStatus.USED}>Used</option>
-                  <option value={TicketStatus.SCANNED}>Scanned</option>
-                  <option value={TicketStatus.CANCELLED}>Cancelled</option>
-                  <option value={TicketStatus.EXPIRED}>Expired</option>
-                </select>
+                  onValueChange={setStatusFilter}
+                  options={statusOptions}
+                />
               </div>
             </div>
           </CardContent>

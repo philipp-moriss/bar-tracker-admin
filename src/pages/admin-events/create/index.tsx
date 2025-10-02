@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save, Calendar, MapPin } from 'lucide-react';
+import { ArrowLeft, Save, Calendar } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
 import { ImageUploadResult } from '@/core/services/imageService';
@@ -26,19 +26,59 @@ import {
 } from '@/core/components/ui/form';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Textarea } from '@/core/components/ui/inputs/textarea';
-// import { Select } from '@/core/components/ui/inputs/select';
+import { FormSelect } from '@/core/components/ui/inputs/FormSelect';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
 import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation } from '@/core/types/event';
 import { Bar } from '@/core/types/bar';
 import { AnalyticsService } from '@/core/services/analyticsService';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
+import { CURRENCIES, getCurrencyByCountry } from '@/core/constants/currencies';
+
+// Функция для автоматического определения timezone по стране
+const getTimezoneByCountry = (country: string): string => {
+  const timezoneMap: { [key: string]: string } = {
+    'Poland': 'Europe/Warsaw',
+    'United Kingdom': 'Europe/London',
+    'UK': 'Europe/London',
+    'United States': 'America/New_York',
+    'USA': 'America/New_York',
+    'Germany': 'Europe/Berlin',
+    'France': 'Europe/Paris',
+    'Spain': 'Europe/Madrid',
+    'Italy': 'Europe/Rome',
+    'Netherlands': 'Europe/Amsterdam',
+    'Belgium': 'Europe/Brussels',
+    'Austria': 'Europe/Vienna',
+    'Ireland': 'Europe/Dublin',
+    'Finland': 'Europe/Helsinki',
+    'Portugal': 'Europe/Lisbon',
+    'Greece': 'Europe/Athens',
+    'Cyprus': 'Asia/Nicosia',
+    'Malta': 'Europe/Malta',
+    'Slovenia': 'Europe/Ljubljana',
+    'Slovakia': 'Europe/Bratislava',
+    'Estonia': 'Europe/Tallinn',
+    'Latvia': 'Europe/Riga',
+    'Lithuania': 'Europe/Vilnius',
+    'Luxembourg': 'Europe/Luxembourg',
+    'Czech Republic': 'Europe/Prague',
+    'Hungary': 'Europe/Budapest',
+    'Sweden': 'Europe/Stockholm',
+    'Norway': 'Europe/Oslo',
+    'Denmark': 'Europe/Copenhagen',
+    'Switzerland': 'Europe/Zurich'
+  };
+
+  return timezoneMap[country] || 'Europe/London'; // По умолчанию London
+};
 
 // Form validation schema
 const createEventSchema = z.object({
   name: z.string().min(1, "Event name is required").min(2, "Name must be at least 2 characters"),
   description: z.string().min(1, "Description is required").min(10, "Description must be at least 10 characters"),
   price: z.string().min(1, "Price is required").refine((val) => !isNaN(Number(val)) && Number(val) > 0, "Price must be a positive number"),
+  currency: z.string().min(1, "Currency is required"),
   country: z.string().min(1, "Country is required"),
   startLocationName: z.string().optional(),
   includedDescription: z.string().optional(),
@@ -57,6 +97,7 @@ export const CreateEventPage = () => {
   const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
+  const [selectedCurrency, setSelectedCurrency] = useState<string>('gbp');
 
   useEffect(() => {
     if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
@@ -66,7 +107,7 @@ export const CreateEventPage = () => {
         address: selectedBar.address,
         coordinates: { latitude: selectedBar.coordinates.latitude, longitude: selectedBar.coordinates.longitude },
         order: 0,
-        stayDuration: 60, 
+        stayDuration: 60,
         description: `Starting location at ${selectedBar.name}`,
         barName: selectedBar.name,
         barAddress: selectedBar.address,
@@ -83,8 +124,8 @@ export const CreateEventPage = () => {
       setEventRoute(initialRoute);
 
       setNotificationSettings({
-        startReminder: 15,       
-        locationReminders: 10,   
+        startReminder: 15,
+        locationReminders: 10,
         arrivalNotifications: true,
         departureNotifications: true,
       });
@@ -97,6 +138,7 @@ export const CreateEventPage = () => {
       name: '',
       description: '',
       price: '',
+      currency: 'gbp',
       country: '',
       startLocationName: '',
       includedDescription: '',
@@ -108,8 +150,27 @@ export const CreateEventPage = () => {
   useEffect(() => {
     if (selectedBar) {
       form.setValue('startLocationName', selectedBar.name)
+
+      // Auto-select currency based on bar country
+      const suggestedCurrency = getCurrencyByCountry(selectedBar.country);
+      if (suggestedCurrency) {
+        form.setValue('currency', suggestedCurrency.code);
+        setSelectedCurrency(suggestedCurrency.code);
+      }
     }
   }, [selectedBar])
+
+  // Auto-select currency when country changes
+  useEffect(() => {
+    const country = form.watch('country');
+    if (country) {
+      const suggestedCurrency = getCurrencyByCountry(country);
+      if (suggestedCurrency && suggestedCurrency.code !== selectedCurrency) {
+        form.setValue('currency', suggestedCurrency.code);
+        setSelectedCurrency(suggestedCurrency.code);
+      }
+    }
+  }, [form.watch('country')]);
 
   // Load bars on component mount
   useEffect(() => {
@@ -141,10 +202,12 @@ export const CreateEventPage = () => {
         name: data.name,
         description: data.description,
         price: data.price,
+        currency: data.currency,
         country: data.country,
         startLocationName: data.startLocationName || bar.name,
         includedDescription: data.includedDescription || '',
         startTime: new Date(data.startTime),
+        timezone: getTimezoneByCountry(data.country),
         imageURL: primaryImage,
         startLocation: {
           latitude: bar.coordinates.latitude,
@@ -255,22 +318,23 @@ export const CreateEventPage = () => {
                           Select Bar *
                         </FormLabel>
                         <FormControl>
-                          <select
-                            {...field}
-                            onChange={(e) => {
-                              field.onChange(e.target.value);
-                              const bar = bars.find(b => b.id === e.target.value);
+                          <FormSelect
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              const bar = bars.find(b => b.id === value);
                               setSelectedBar(bar);
                             }}
-                            className="w-full p-3 border border-barTrekker-lightGrey rounded-md bg-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange focus:outline-none"
-                          >
-                            <option value="">Select a bar...</option>
-                            {bars.map((bar) => (
-                              <option key={bar.id} value={bar.id}>
-                                {bar.name} - {bar.city}, {bar.country}
-                              </option>
-                            ))}
-                          </select>
+                            options={[
+                              { value: '', label: 'Select a bar...' },
+                              ...bars.map((bar) => ({
+                                value: bar.id,
+                                label: `${bar.name} - ${bar.city}, ${bar.country}`
+                              }))
+                            ]}
+                            placeholder="Select a bar..."
+                            allowEmpty={true}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -350,15 +414,44 @@ export const CreateEventPage = () => {
 
                   <FormField
                     control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                          Currency *
+                        </FormLabel>
+                        <FormControl>
+                          <FormSelect
+                            value={field.value}
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                              setSelectedCurrency(value);
+                            }}
+                            options={CURRENCIES.map((currency) => ({
+                              value: currency.code,
+                              label: `${currency.symbol} ${currency.name} (${currency.code.toUpperCase()})`
+                            }))}
+                            placeholder="Select currency..."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="price"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                          Price (GBP) *
+                          Price *
                         </FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-barTrekker-darkGrey/70 text-sm">£</span>
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-barTrekker-darkGrey/70 text-sm">
+                              {CURRENCIES.find(c => c.code === selectedCurrency)?.symbol || '£'}
+                            </span>
                             <Input
                               {...field}
                               type="number"
@@ -435,7 +528,7 @@ export const CreateEventPage = () => {
                         <Input
                           {...field}
                           type="datetime-local"
-                            lang="en-GB"
+                          lang="en-GB"
                           className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
                         />
                       </FormControl>

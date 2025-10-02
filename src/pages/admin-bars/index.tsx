@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Eye, Plus, Edit, Trash2, MapPin, Phone, Mail, Globe, Building2, Users, DollarSign, Star } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, MapPin, Phone, Mail, Globe, Building2, Users, DollarSign, Star } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 
 import { Button } from '@/core/components/ui/button';
@@ -10,7 +10,8 @@ import {
     CardTitle,
     CardContent,
 } from '@/core/components/ui/card';
-import { Input } from '@/core/components/ui/inputs/input';
+import { SearchInput } from '@/core/components/ui/inputs/SearchInput';
+import { FilterSelect } from '@/core/components/ui/inputs/FilterSelect';
 import {
     Table,
     TableBody,
@@ -22,6 +23,13 @@ import {
 import { Badge } from '@/core/components/ui/badge';
 import { barService } from '@/core/services/barService';
 import { Bar, BarFilters } from '@/core/types/bar';
+
+// Опции для фильтра статусов
+const statusOptions = [
+    { value: 'all', label: 'All Status' },
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' }
+];
 import { toast } from 'sonner';
 import { ConfirmModal } from '@/core/components/ui/modals/ConfirmModal';
 
@@ -30,10 +38,7 @@ export const AdminBarsPage = () => {
     const [bars, setBars] = useState<Bar[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [cityFilter, setCityFilter] = useState('');
-    const [countryFilter, setCountryFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
-    const [error, setError] = useState<string | null>(null);
 
     // Modal states
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -48,19 +53,15 @@ export const AdminBarsPage = () => {
     const loadBars = async () => {
         try {
             setLoading(true);
-            setError(null);
 
             const filters: BarFilters = {
                 search: searchTerm || undefined,
-                city: cityFilter || undefined,
-                country: countryFilter || undefined,
                 isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
             };
 
             const barsData = await barService.getBars(filters);
             setBars(barsData);
         } catch (err) {
-            setError('Failed to load bars');
             console.error('Error loading bars:', err);
         } finally {
             setLoading(false);
@@ -74,7 +75,7 @@ export const AdminBarsPage = () => {
         }, 300);
 
         return () => clearTimeout(timeoutId);
-    }, [searchTerm, cityFilter, countryFilter, statusFilter]);
+    }, [searchTerm, statusFilter]);
 
     const handleDeleteBar = (barId: string, barName: string) => {
         setSelectedBar({ id: barId, name: barName });
@@ -128,44 +129,29 @@ export const AdminBarsPage = () => {
         <AdminLayout title="Bars Management" subtitle="Manage all bars and their information">
             <div className="max-w-7xl mx-auto">
                 {/* Filters */}
-                <Card className="mb-6">
-                    <CardContent className="pt-6">
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                            <div>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                                    <Input
-                                        placeholder="Search bars..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-10"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <Input
-                                    placeholder="Filter by city..."
-                                    value={cityFilter}
-                                    onChange={(e) => setCityFilter(e.target.value)}
+                <Card className="mb-8 shadow-sm border-0 bg-gradient-to-r from-gray-50 to-white">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-lg font-semibold text-gray-800 flex items-center">
+                            <Search className="h-5 w-5 mr-2 text-barTrekker-orange" />
+                            Search & Filter Bars
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                        <div className="flex flex-col md:flex-row gap-4">
+                            <div className="flex-1">
+                                <SearchInput
+                                    placeholder="Search by bar name, city, country, or address..."
+                                    value={searchTerm}
+                                    onChange={setSearchTerm}
                                 />
                             </div>
-                            <div>
-                                <Input
-                                    placeholder="Filter by country..."
-                                    value={countryFilter}
-                                    onChange={(e) => setCountryFilter(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <select
+                            <div className="md:w-48">
+                                <FilterSelect
+                                    placeholder="All Status"
                                     value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-                                    className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-barTrekker-orange focus:border-barTrekker-orange"
-                                >
-                                    <option value="all">All Status</option>
-                                    <option value="active">Active</option>
-                                    <option value="inactive">Inactive</option>
-                                </select>
+                                    onValueChange={setStatusFilter}
+                                    options={statusOptions}
+                                />
                             </div>
                             <div>
                                 <Button

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Edit, Trash2, Eye, Calendar, MapPin, DollarSign } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Eye, Calendar, MapPin, CheckCircle } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 
 import { Button } from '@/core/components/ui/button';
@@ -10,7 +10,8 @@ import {
   CardTitle,
   CardContent,
 } from '@/core/components/ui/card';
-import { Input } from '@/core/components/ui/inputs/input';
+import { SearchInput } from '@/core/components/ui/inputs/SearchInput';
+import { FilterSelect } from '@/core/components/ui/inputs/FilterSelect';
 import {
   Table,
   TableBody,
@@ -23,9 +24,20 @@ import { Badge } from '@/core/components/ui/badge';
 import { eventService } from '@/core/services/eventService';
 import { Event, EventStatus, EventFilters } from '@/core/types/event';
 import { AnalyticsService } from '@/core/services/analyticsService';
+import { CURRENCIES } from '@/core/constants/currencies';
 import { EventViewModal } from '@/core/components/ui/modals/EventViewModal';
 import { EventEditModal } from '@/core/components/ui/modals/EventEditModal';
+
+// Опции для фильтра статусов
+const statusOptions = [
+  { value: 'all', label: 'All Status' },
+  { value: EventStatus.ACTIVE, label: 'Active' },
+  { value: EventStatus.COMPLETED, label: 'Completed' },
+  { value: EventStatus.CANCELLED, label: 'Cancelled' },
+  { value: EventStatus.DRAFT, label: 'Draft' }
+];
 import { DeleteConfirmModal } from '@/core/components/ui/modals/DeleteConfirmModal';
+import { EventInfoModal } from '@/core/components/ui/modals/EventInfoModal';
 
 export const AdminEventsPage = () => {
   const navigate = useNavigate();
@@ -36,13 +48,16 @@ export const AdminEventsPage = () => {
   const [sortBy, setSortBy] = useState<EventFilters['sortBy']>('startTime');
   const [sortDir, setSortDir] = useState<EventFilters['sortDir']>('desc');
   const [error, setError] = useState<string | null>(null);
-  
+
   // Modal states
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [autoCompleteLoading, setAutoCompleteLoading] = useState(false);
+  const [infoModalOpen, setInfoModalOpen] = useState(false);
+  const [infoModalMessage, setInfoModalMessage] = useState('');
 
   // Load events on component mount
   useEffect(() => {
@@ -54,7 +69,7 @@ export const AdminEventsPage = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const filters: EventFilters = {
         search: searchTerm || undefined,
         status: statusFilter || undefined,
@@ -131,6 +146,29 @@ export const AdminEventsPage = () => {
     loadEvents();
   };
 
+  const handleAutoCompleteExpired = async () => {
+    try {
+      setAutoCompleteLoading(true);
+      const count = await eventService.autoCompleteExpiredEvents();
+
+      if (count > 0) {
+        setInfoModalMessage(`Successfully completed ${count} expired event(s)! All past events with "Active" status have been updated to "Completed".`);
+        setInfoModalOpen(true);
+        await loadEvents();
+        AnalyticsService.logCustomEvent('events_auto_completed', { count });
+      } else {
+        // Не показываем модалку, если нет просроченных событий
+        // Просто логируем в консоль для отладки
+        console.log('No expired active events found. All active events have future dates.');
+      }
+    } catch (err) {
+      setError('Failed to auto-complete expired events');
+      console.error('Error auto-completing events:', err);
+    } finally {
+      setAutoCompleteLoading(false);
+    }
+  };
+
 
   const getStatusBadge = (status: EventStatus) => {
     const statusConfig = {
@@ -150,51 +188,68 @@ export const AdminEventsPage = () => {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   };
 
-  const formatPrice = (price: string) => {
-    return `£${parseFloat(price || '0').toFixed(2)}`;
+  const formatPrice = (price: string, currency?: string) => {
+    const currencyCode = currency || 'gbp';
+    const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol || '£';
+    return `${currencySymbol}${parseFloat(price || '0').toFixed(2)}`;
   };
 
   return (
     <AdminLayout title="Events Management" subtitle="Manage all BarTrekker events and tours">
       <div className="max-w-7xl mx-auto">
-        {/* Create Event Button */}
-        <div className="flex justify-end mb-6">
+        {/* Header Actions */}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-8">
+          {/* Auto-Complete Section */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <Button
+              onClick={handleAutoCompleteExpired}
+              disabled={autoCompleteLoading}
+              variant="outline"
+              className="flex items-center space-x-2 w-full sm:w-auto"
+            >
+              <CheckCircle className="h-4 w-4" />
+              <span>{autoCompleteLoading ? 'Processing...' : 'Complete Expired Events'}</span>
+            </Button>
+            <div className="flex items-center text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
+              <div className="text-blue-500 mr-2">💡</div>
+              <span>Expired events are auto-completed every hour</span>
+            </div>
+          </div>
+
+          {/* Create Event Button */}
           <Button
             onClick={handleCreateEvent}
-            className="flex items-center space-x-2 bg-barTrekker-orange hover:bg-barTrekker-orange/90"
+            className="flex items-center space-x-2 bg-barTrekker-orange hover:bg-barTrekker-orange/90 w-full lg:w-auto"
           >
             <Plus className="h-4 w-4" />
-            <span>Create Event</span>
+            <span>Create New Event</span>
           </Button>
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
+        <Card className="mb-8 shadow-sm border-0 bg-gradient-to-r from-gray-50 to-white">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold text-gray-800 flex items-center">
+              <Search className="h-5 w-5 mr-2 text-barTrekker-orange" />
+              Search & Filter Events
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                  <Input
-                    placeholder="Search events..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+                <SearchInput
+                  placeholder="Search by event name, location, or description..."
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                />
               </div>
               <div className="md:w-48">
-                <select
+                <FilterSelect
+                  placeholder="All Status"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as EventStatus | '')}
-                  className="w-full px-3 py-2 border border-barTrekker-lightGrey rounded-md focus:outline-none focus:ring-2 focus:ring-barTrekker-orange"
-                >
-                  <option value="">All Status</option>
-                  <option value={EventStatus.ACTIVE}>Active</option>
-                  <option value={EventStatus.COMPLETED}>Completed</option>
-                  <option value={EventStatus.CANCELLED}>Cancelled</option>
-                  <option value={EventStatus.DRAFT}>Draft</option>
-                </select>
+                  onValueChange={setStatusFilter}
+                  options={statusOptions}
+                />
               </div>
             </div>
           </CardContent>
@@ -302,10 +357,7 @@ export const AdminEventsPage = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center space-x-1">
-                            <DollarSign className="h-3 w-3" />
-                            <span>{formatPrice(event.price)}</span>
-                          </div>
+                          <span>{formatPrice(event.price, event.currency)}</span>
                         </TableCell>
                         <TableCell>
                           {getStatusBadge(event.status || EventStatus.DRAFT)}
@@ -376,6 +428,13 @@ export const AdminEventsPage = () => {
           onConfirm={confirmDeleteEvent}
           loading={deleteLoading}
           textKey={`Are you sure you want to delete "${selectedEvent?.name}"?`}
+        />
+
+        {/* Info Modal */}
+        <EventInfoModal
+          open={infoModalOpen}
+          onOpenChange={setInfoModalOpen}
+          message={infoModalMessage}
         />
       </div>
     </AdminLayout>

@@ -38,8 +38,21 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
   };
 
-  const formatPrice = (price: string) => {
-    return `£${parseFloat(price || '0').toFixed(2)}`;
+  const formatPrice = (price: string, currency: string = 'gbp') => {
+    const currencySymbols: { [key: string]: string } = {
+      'gbp': '£',
+      'usd': '$',
+      'eur': '€',
+      'pln': 'zł',
+      'czk': 'Kč',
+      'huf': 'Ft',
+      'sek': 'kr',
+      'nok': 'kr',
+      'dkk': 'kr',
+      'chf': 'CHF'
+    };
+    const symbol = currencySymbols[currency] || '£';
+    return `${symbol}${parseFloat(price || '0').toFixed(2)}`;
   };
 
   return (
@@ -66,8 +79,8 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
           <div className="lg:w-1/2">
             {event.imageURL ? (
               <div className="w-full h-64 lg:h-80 rounded-xl overflow-hidden shadow-lg">
-                <img 
-                  src={event.imageURL} 
+                <img
+                  src={event.imageURL}
                   alt={event.name}
                   className="w-full h-full object-cover"
                 />
@@ -100,8 +113,29 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
                 <InfoItem
                   icon={DollarSign}
                   label="Price"
-                  value={<span className="text-lg font-semibold text-gray-900">{formatPrice(event.price)}</span>}
+                  value={<span className="text-lg font-semibold text-gray-900">{formatPrice(event.price, event.currency)}</span>}
                 />
+                {event.endTime && (
+                  <InfoItem
+                    icon={Calendar}
+                    label="End Time"
+                    value={formatDate(event.endTime)}
+                  />
+                )}
+                {event.route?.totalDuration && (
+                  <InfoItem
+                    icon={Calendar}
+                    label="Duration"
+                    value={`${event.route.totalDuration} minutes`}
+                  />
+                )}
+                {event.timezone && (
+                  <InfoItem
+                    icon={Globe}
+                    label="Timezone"
+                    value={event.timezone}
+                  />
+                )}
                 <InfoItem
                   icon={Globe}
                   label="Country"
@@ -138,12 +172,109 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
           </InfoCard>
         )}
 
+        {/* Bar Information Section */}
+        <InfoCard title="Bar Information">
+          {event.route?.locations && event.route.locations.length > 0 ? (
+            <div className="space-y-6">
+              <p className="text-sm text-gray-600 mb-4">
+                This event includes {event.route.locations.length} bar{event.route.locations.length > 1 ? 's' : ''} in the route:
+              </p>
+              {event.route.locations.map((location, index) => (
+                <div key={location.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="font-semibold text-gray-900">
+                      Stop {location.order || index + 1}: {location.name || location.barName || `Bar ${index + 1}`}
+                    </h4>
+                    <span className="text-sm text-gray-600 bg-white px-2 py-1 rounded">
+                      {location.stayDuration} min
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="font-medium text-gray-700">Address:</span>
+                      <p className="text-gray-600">{location.address || location.barAddress || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="font-medium text-gray-700">Coordinates:</span>
+                      <p className="text-gray-600 font-mono text-xs">
+                        {location.coordinates.latitude.toFixed(6)}, {location.coordinates.longitude.toFixed(6)}
+                      </p>
+                    </div>
+                    {location.barPhone && (
+                      <div>
+                        <span className="font-medium text-gray-700">Phone:</span>
+                        <p className="text-gray-600">{location.barPhone}</p>
+                      </div>
+                    )}
+                    {location.barEmail && (
+                      <div>
+                        <span className="font-medium text-gray-700">Email:</span>
+                        <p className="text-gray-600">{location.barEmail}</p>
+                      </div>
+                    )}
+                  </div>
+                  {location.description && (
+                    <div className="mt-3">
+                      <span className="font-medium text-gray-700">Description:</span>
+                      <p className="text-gray-600 text-sm mt-1">{location.description}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <InfoItem
+                icon={MapPin}
+                label="Bar Name"
+                value={event.barName || 'N/A'}
+              />
+              <InfoItem
+                icon={MapPin}
+                label="Bar Address"
+                value={event.barAddress || 'N/A'}
+              />
+              <InfoItem
+                icon={MapPin}
+                label="Bar City"
+                value={event.barCity || 'N/A'}
+              />
+              <InfoItem
+                icon={Globe}
+                label="Bar Country"
+                value={event.barCountry || 'N/A'}
+              />
+              {event.barPhone && (
+                <InfoItem
+                  icon={MapPin}
+                  label="Bar Phone"
+                  value={event.barPhone}
+                />
+              )}
+              {event.barEmail && (
+                <InfoItem
+                  icon={MapPin}
+                  label="Bar Email"
+                  value={event.barEmail}
+                />
+              )}
+              {event.barWebsite && (
+                <InfoItem
+                  icon={Globe}
+                  label="Bar Website"
+                  value={<a href={event.barWebsite} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">{event.barWebsite}</a>}
+                />
+              )}
+            </div>
+          )}
+        </InfoCard>
+
         {/* Technical Details */}
         <div className="bg-gray-50 rounded-xl p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Technical Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">Coordinates</p>
+              <p className="text-sm font-medium text-gray-500 mb-1">Start Coordinates</p>
               <p className="text-sm text-gray-700 font-mono">
                 Lat: {event.startLocation.latitude}, Lng: {event.startLocation.longitude}
               </p>
@@ -152,6 +283,20 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
               <p className="text-sm font-medium text-gray-500 mb-1">Event ID</p>
               <p className="text-sm text-gray-700 font-mono">{event.id}</p>
             </div>
+            {event.route?.totalDuration && (
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">Total Route Duration</p>
+                <p className="text-sm text-gray-700">{event.route.totalDuration} minutes</p>
+              </div>
+            )}
+            {event.route?.locations && (
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-1">Route Status</p>
+                <p className="text-sm text-gray-700">
+                  {event.route.isActive ? 'Active' : 'Inactive'} • {event.route.locations.length} stops
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

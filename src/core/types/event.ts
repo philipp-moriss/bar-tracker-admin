@@ -35,6 +35,7 @@ export interface Event {
   id?: string
   name: string
   price: string
+  currency: string
   description: string
   imageURL: string
   rating?: number
@@ -43,7 +44,9 @@ export interface Event {
     longitude: number
   }
   startTime: Timestamp | Date
+  endTime?: Timestamp | Date
   country: string
+  timezone?: string // e.g., 'Europe/Warsaw', 'Europe/London'
   includedDescription: string
   startLocationName: string
   // Bar information embedded in event
@@ -66,10 +69,13 @@ export interface Event {
 export interface CreateEventData {
   name: string
   price: string
+  currency: string
   description: string
   imageURL: string
   startTime: Date
+  endTime?: Date
   country: string
+  timezone?: string // e.g., 'Europe/Warsaw', 'Europe/London'
   includedDescription: string
   startLocationName: string
   startLocation: {
@@ -92,6 +98,7 @@ export interface CreateEventData {
 
 export interface UpdateEventData extends Partial<CreateEventData> {
   id: string
+  status?: EventStatus
 }
 
 export enum EventStatus {

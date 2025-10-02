@@ -10,7 +10,8 @@ import {
   CardTitle,
   CardContent,
 } from '@/core/components/ui/card';
-import { Input } from '@/core/components/ui/inputs/input';
+import { SearchInput } from '@/core/components/ui/inputs/SearchInput';
+import { FilterSelect } from '@/core/components/ui/inputs/FilterSelect';
 import {
   Table,
   TableBody,
@@ -23,6 +24,22 @@ import { Badge } from '@/core/components/ui/badge';
 import { userService } from '@/core/services/userService';
 import { barService } from '@/core/services/barService';
 import { User as UserType, UserRole, UserStatus, UserFilters } from '@/core/types/user';
+
+// Опции для фильтра ролей
+const roleOptions = [
+  { value: 'all', label: 'All Roles' },
+  { value: UserRole.USER, label: 'User' },
+  { value: UserRole.BARTENDER, label: 'Bartender' },
+  { value: UserRole.ADMIN, label: 'Admin' }
+];
+
+// Опции для фильтра статусов
+const statusOptions = [
+  { value: 'all', label: 'All Status' },
+  { value: UserStatus.ACTIVE, label: 'Active' },
+  { value: UserStatus.INACTIVE, label: 'Inactive' },
+  { value: UserStatus.PENDING, label: 'Pending' }
+];
 import { AnalyticsService } from '@/core/services/analyticsService';
 import { toast } from 'sonner';
 import { ConfirmModal } from '@/core/components/ui/modals/ConfirmModal';
@@ -278,43 +295,37 @@ export const AdminUsersPage = () => {
     <AdminLayout title="Users Management" subtitle="Manage all BarTrekker users and their roles">
       <div className="max-w-7xl mx-auto">
         {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
+        <Card className="mb-8 shadow-sm border-0 bg-gradient-to-r from-gray-50 to-white">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold text-gray-800 flex items-center">
+              <Search className="h-5 w-5 mr-2 text-barTrekker-orange" />
+              Search & Filter Users
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-barTrekker-darkGrey/50 h-4 w-4" />
-                  <Input
-                    placeholder="Search users..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+                <SearchInput
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={setSearchTerm}
+                />
               </div>
               <div>
-                <select
+                <FilterSelect
+                  placeholder="All Roles"
                   value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value as UserRole | '')}
-                  className="w-full px-3 py-2 border border-barTrekker-lightGrey rounded-md focus:outline-none focus:ring-2 focus:ring-barTrekker-orange"
-                >
-                  <option value="">All Roles</option>
-                  <option value={UserRole.USER}>User</option>
-                  <option value={UserRole.BARTENDER}>Bartender</option>
-                  <option value={UserRole.ADMIN}>Admin</option>
-                </select>
+                  onValueChange={setRoleFilter}
+                  options={roleOptions}
+                />
               </div>
               <div>
-                <select
+                <FilterSelect
+                  placeholder="All Status"
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as UserStatus | '')}
-                  className="w-full px-3 py-2 border border-barTrekker-lightGrey rounded-md focus:outline-none focus:ring-2 focus:ring-barTrekker-orange"
-                >
-                  <option value="">All Status</option>
-                  <option value={UserStatus.ACTIVE}>Active</option>
-                  <option value={UserStatus.INACTIVE}>Inactive</option>
-                  <option value={UserStatus.PENDING}>Pending</option>
-                </select>
+                  onValueChange={setStatusFilter}
+                  options={statusOptions}
+                />
               </div>
               <div>
                 <Button
