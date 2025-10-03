@@ -186,9 +186,6 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
         updatePayload.startTime = Timestamp.fromDate(updatePayload.startTime)
       }
 
-      if (updatePayload.endTime) {
-        updatePayload.endTime = Timestamp.fromDate(updatePayload.endTime)
-      }
 
       await updateDoc(docRef, updatePayload)
     } catch (error) {
@@ -267,15 +264,21 @@ async function autoCompleteExpiredEvents(): Promise<number> {
         let eventEndTime: Date
         const eventStartTime = event.startTime instanceof Date ? event.startTime : event.startTime.toDate()
 
-        if (event.endTime) {
-          eventEndTime = event.endTime instanceof Date ? event.endTime : event.endTime.toDate()
-        } else if (event.route?.totalDuration) {
+        // Умная логика определения времени окончания по времени начала
+        const hour = eventStartTime.getHours()
+        let defaultDuration = 3 // по умолчанию 3 часа
+        
+        if (hour >= 18 && hour <= 22) defaultDuration = 4 // вечерние события (18:00-22:00) = 4 часа
+        if (hour >= 10 && hour <= 17) defaultDuration = 3 // дневные события (10:00-17:00) = 3 часа  
+        if (hour >= 23 || hour <= 6) defaultDuration = 6  // ночные события = 6 часов
+        
+        if (event.route?.totalDuration) {
           eventEndTime = new Date(eventStartTime.getTime() + event.route.totalDuration * 60 * 1000)
         } else {
-          eventEndTime = new Date(eventStartTime.getTime() + 3 * 60 * 60 * 1000)
+          eventEndTime = new Date(eventStartTime.getTime() + defaultDuration * 60 * 60 * 1000)
         }
 
-        const duration = event.route?.totalDuration ? `${event.route.totalDuration} min` : '3 hours (default)'
+        const duration = event.route?.totalDuration ? `${event.route.totalDuration} min` : `${defaultDuration} hours (smart default)`
         console.log(`Event "${event.name}": startTime=${eventStartTime.toLocaleString()}, duration=${duration}, endTime=${eventEndTime.toLocaleString()}, now=${now.toLocaleString()}, expired=${eventEndTime < now}`)
 
         if (eventEndTime < now) {

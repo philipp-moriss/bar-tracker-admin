@@ -44,7 +44,6 @@ export interface Event {
     longitude: number
   }
   startTime: Timestamp | Date
-  endTime?: Timestamp | Date
   country: string
   timezone?: string // e.g., 'Europe/Warsaw', 'Europe/London'
   includedDescription: string
@@ -75,7 +74,6 @@ export interface CreateEventData {
   description: string
   imageURL: string
   startTime: Date
-  endTime?: Date
   country: string
   timezone?: string // e.g., 'Europe/Warsaw', 'Europe/London'
   includedDescription: string

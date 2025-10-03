@@ -29,11 +29,32 @@ exports.autoCompleteEvents = functions.pubsub.schedule('0 0 * * *')
       let count = 0;
       
       snapshot.forEach((doc) => {
-        batch.update(doc.ref, {
-          status: 'completed',
-          updatedAt: now
-        });
-        count++;
+        const eventData = doc.data();
+        const eventStartTime = eventData.startTime.toDate();
+        
+        // Умная логика определения времени окончания по времени начала
+        const hour = eventStartTime.getHours();
+        let defaultDuration = 3; // по умолчанию 3 часа
+        
+        if (hour >= 18 && hour <= 22) defaultDuration = 4; // вечерние события (18:00-22:00) = 4 часа
+        if (hour >= 10 && hour <= 17) defaultDuration = 3; // дневные события (10:00-17:00) = 3 часа  
+        if (hour >= 23 || hour <= 6) defaultDuration = 6;  // ночные события = 6 часов
+        
+        let eventEndTime;
+        if (eventData.route?.totalDuration) {
+          eventEndTime = new Date(eventStartTime.getTime() + eventData.route.totalDuration * 60 * 1000);
+        } else {
+          eventEndTime = new Date(eventStartTime.getTime() + defaultDuration * 60 * 60 * 1000);
+        }
+        
+        // Событие завершено, если время окончания прошло
+        if (eventEndTime < now.toDate()) {
+          batch.update(doc.ref, {
+            status: 'completed',
+            updatedAt: now
+          });
+          count++;
+        }
       });
       
       await batch.commit();
@@ -66,7 +87,6 @@ exports.completeExpiredEvents = functions.https.onRequest((req, res) => {
       const eventsRef = db.collection('events');
       const snapshot = await eventsRef
         .where('status', '==', 'active')
-        .where('startTime', '<', now)
         .get();
       
       if (snapshot.empty) {
@@ -84,11 +104,32 @@ exports.completeExpiredEvents = functions.https.onRequest((req, res) => {
       let count = 0;
       
       snapshot.forEach((doc) => {
-        batch.update(doc.ref, {
-          status: 'completed',
-          updatedAt: now
-        });
-        count++;
+        const eventData = doc.data();
+        const eventStartTime = eventData.startTime.toDate();
+        
+        // Умная логика определения времени окончания по времени начала
+        const hour = eventStartTime.getHours();
+        let defaultDuration = 3; // по умолчанию 3 часа
+        
+        if (hour >= 18 && hour <= 22) defaultDuration = 4; // вечерние события (18:00-22:00) = 4 часа
+        if (hour >= 10 && hour <= 17) defaultDuration = 3; // дневные события (10:00-17:00) = 3 часа  
+        if (hour >= 23 || hour <= 6) defaultDuration = 6;  // ночные события = 6 часов
+        
+        let eventEndTime;
+        if (eventData.route?.totalDuration) {
+          eventEndTime = new Date(eventStartTime.getTime() + eventData.route.totalDuration * 60 * 1000);
+        } else {
+          eventEndTime = new Date(eventStartTime.getTime() + defaultDuration * 60 * 60 * 1000);
+        }
+        
+        // Событие завершено, если время окончания прошло
+        if (eventEndTime < now.toDate()) {
+          batch.update(doc.ref, {
+            status: 'completed',
+            updatedAt: now
+          });
+          count++;
+        }
       });
       
       await batch.commit();

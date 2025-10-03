@@ -115,13 +115,6 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
                   label="Price"
                   value={<span className="text-lg font-semibold text-gray-900">{formatPrice(event.price, event.currency)}</span>}
                 />
-                {event.endTime && (
-                  <InfoItem
-                    icon={Calendar}
-                    label="End Time"
-                    value={formatDate(event.endTime)}
-                  />
-                )}
                 {event.route?.totalDuration && (
                   <InfoItem
                     icon={Calendar}
