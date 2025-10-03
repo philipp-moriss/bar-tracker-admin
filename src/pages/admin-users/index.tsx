@@ -596,14 +596,16 @@ export const AdminUsersPage = () => {
         open={assignBarModalOpen}
         onOpenChange={setAssignBarModalOpen}
         title="Assign Bars to Bartender"
-        description={`Assign bars to "${selectedUser?.name}". Bartender can work at multiple bars.`}
         showConfirmButton
         confirmText="Save Bars"
         onConfirm={confirmAssignBar}
         loading={actionLoading}
         size="2xl"
       >
-        <div className="mt-4">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Assign bars to "{selectedUser?.name}". Bartender can work at multiple bars.
+          </p>
           <BarMultiSelector
             selectedBarNames={selectedBarNames}
             onSelectionChange={setSelectedBarNames}
