@@ -204,16 +204,17 @@ export const AdminUsersPage = () => {
       setActionLoading(true);
 
       // Update to new format (barNames array)
+      // Use null to explicitly clear fields when empty
       const updateData: any = {
-        barNames: selectedBarNames.length > 0 ? selectedBarNames : [],
+        barNames: selectedBarNames.length > 0 ? selectedBarNames : null,
         // Keep legacy barName field for backward compatibility
-        barName: selectedBarNames.length > 0 ? selectedBarNames[0] : undefined
+        barName: selectedBarNames.length > 0 ? selectedBarNames[0] : null
       };
 
       await userService.updateUser(selectedUser.id, updateData);
 
       const message = selectedBarNames.length === 0
-        ? 'Bars cleared'
+        ? 'Bars cleared successfully'
         : `Assigned to ${selectedBarNames.length} bar(s): ${selectedBarNames.join(', ')}`;
 
       toast.success(message);
