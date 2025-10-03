@@ -12,7 +12,7 @@ interface FormSelectProps {
     options: SelectOption[];
     placeholder: string;
     className?: string;
-    allowEmpty?: boolean; // Новый пропс для разрешения пустого значения
+    allowEmpty?: boolean;
 }
 
 export const FormSelect: React.FC<FormSelectProps> = ({
@@ -23,16 +23,13 @@ export const FormSelect: React.FC<FormSelectProps> = ({
     className = '',
     allowEmpty = false
 }) => {
-    // Фильтруем опции, убирая пустые значения если allowEmpty = false
     const filteredOptions = allowEmpty
         ? options
         : options.filter(option => option.value !== '');
 
-    // Преобразуем пустое значение в специальное значение для Radix UI
     const displayValue = value === '' ? 'placeholder' : value;
 
     const handleValueChange = (newValue: string) => {
-        // Преобразуем обратно специальное значение в пустую строку
         onValueChange(newValue === 'placeholder' ? '' : newValue);
     };
 

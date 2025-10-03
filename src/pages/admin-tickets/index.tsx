@@ -29,7 +29,6 @@ import { ticketService } from '@/core/services/ticketService';
 import { Ticket, TicketStatus, TicketFilters, TicketStats } from '@/core/types/ticket';
 import { AnalyticsService } from '@/core/services/analyticsService';
 
-// Опции для фильтра статусов
 const statusOptions = [
   { value: 'all', label: 'All Status' },
   { value: TicketStatus.ACTIVE, label: 'Active' },

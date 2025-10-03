@@ -35,7 +35,6 @@ import { AnalyticsService } from '@/core/services/analyticsService';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
 import { CURRENCIES, getCurrencyByCountry } from '@/core/constants/currencies';
 
-// Функция для автоматического определения timezone по стране
 const getTimezoneByCountry = (country: string): string => {
   const timezoneMap: { [key: string]: string } = {
     'Poland': 'Europe/Warsaw',
@@ -70,7 +69,7 @@ const getTimezoneByCountry = (country: string): string => {
     'Switzerland': 'Europe/Zurich'
   };
 
-  return timezoneMap[country] || 'Europe/London'; // По умолчанию London
+  return timezoneMap[country] || 'Europe/London';
 };
 
 // Form validation schema

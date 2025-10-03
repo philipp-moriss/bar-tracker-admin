@@ -12,7 +12,6 @@ import { Bar } from '@/core/types/bar';
 import { CURRENCIES } from '@/core/constants/currencies';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
 
-// Функция для автоматического определения timezone по стране
 const getTimezoneByCountry = (country: string): string => {
   const timezoneMap: { [key: string]: string } = {
     'Poland': 'Europe/Warsaw',
@@ -47,7 +46,7 @@ const getTimezoneByCountry = (country: string): string => {
     'Switzerland': 'Europe/Zurich'
   };
 
-  return timezoneMap[country] || 'Europe/London'; // По умолчанию London
+  return timezoneMap[country] || 'Europe/London';
 };
 import { ConfirmModal } from './ConfirmModal';
 
@@ -100,7 +99,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
     onConfirm: () => void;
   } | null>(null);
 
-  // Загружаем бары при открытии модалки
   useEffect(() => {
     const loadBars = async () => {
       try {
@@ -142,7 +140,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         status: event.status || EventStatus.DRAFT
       });
 
-      // Инициализируем маршрут и настройки уведомлений
       setEventRoute(event.route);
       setNotificationSettings(event.notificationSettings);
     }
@@ -155,7 +152,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         [field]: value
       };
 
-      // Автоматически обновляем timezone при изменении страны
       if (field === 'country' && typeof value === 'string') {
         newData.timezone = getTimezoneByCountry(value);
       }
@@ -182,7 +178,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
     const eventDate = new Date(formData.startTime);
     const isPastEvent = eventDate < now;
 
-    // Проверяем логичность комбинации даты и статуса
     if (isPastEvent && formData.status === EventStatus.ACTIVE) {
       return 'Warning: Setting an event with a past date as "Active" may not make sense. Consider changing the status to "Completed" or updating the date.';
     }
@@ -197,7 +192,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
   const handleSave = async () => {
     if (!formData.id) return;
 
-    // Валидация даты и статуса
     const validationWarning = validateDateAndStatus();
     if (validationWarning) {
       setConfirmData({
@@ -219,7 +213,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
       setLoading(true);
       setError(null);
 
-      // Создаем полные данные для обновления, включая маршрут и настройки уведомлений
       const updateData: UpdateEventData = {
         ...formData,
         route: eventRoute,
@@ -250,7 +243,6 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
 
   if (!event) return null;
 
-  // Находим стартовый бар для EventRouteManager
   const startBar = bars.find(bar =>
     bar.name === event.barName &&
     bar.city === event.barCity &&
@@ -293,7 +285,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
 
             <FormField label="Currency" required>
               <FormSelect
-                value={formData.currency}
+                value={formData.currency || 'gbp'}
                 onValueChange={(value) => handleInputChange('currency', value)}
                 options={CURRENCIES.map((currency) => ({
                   value: currency.code,
@@ -372,7 +364,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
 
             <FormField label="Status">
               <FormSelect
-                value={formData.status}
+                value={formData.status || EventStatus.DRAFT}
                 onValueChange={(value) => handleInputChange('status', value as EventStatus)}
                 options={[
                   { value: EventStatus.DRAFT, label: 'Draft' },

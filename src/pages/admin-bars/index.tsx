@@ -24,7 +24,6 @@ import { Badge } from '@/core/components/ui/badge';
 import { barService } from '@/core/services/barService';
 import { Bar, BarFilters } from '@/core/types/bar';
 
-// Опции для фильтра статусов
 const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'active', label: 'Active' },

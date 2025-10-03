@@ -25,7 +25,6 @@ import { userService } from '@/core/services/userService';
 import { barService } from '@/core/services/barService';
 import { User as UserType, UserRole, UserStatus, UserFilters } from '@/core/types/user';
 
-// Опции для фильтра ролей
 const roleOptions = [
   { value: 'all', label: 'All Roles' },
   { value: UserRole.USER, label: 'User' },
@@ -33,7 +32,6 @@ const roleOptions = [
   { value: UserRole.ADMIN, label: 'Admin' }
 ];
 
-// Опции для фильтра статусов
 const statusOptions = [
   { value: 'all', label: 'All Status' },
   { value: UserStatus.ACTIVE, label: 'Active' },

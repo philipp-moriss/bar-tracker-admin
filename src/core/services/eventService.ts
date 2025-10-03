@@ -248,7 +248,6 @@ async function getEventStats(): Promise<EventStats> {
 async function autoCompleteExpiredEvents(): Promise<number> {
   try {
     const events = await getEvents({ status: EventStatus.ACTIVE })
-    // Используем локальное время компьютера
     const now = new Date()
     let count = 0
 
@@ -256,25 +255,20 @@ async function autoCompleteExpiredEvents(): Promise<number> {
 
     for (const event of events) {
       if (event.id && event.startTime) {
-        // Определяем время окончания события
         let eventEndTime: Date
         const eventStartTime = event.startTime instanceof Date ? event.startTime : event.startTime.toDate()
 
         if (event.endTime) {
-          // Если есть конкретное время окончания, используем его
           eventEndTime = event.endTime instanceof Date ? event.endTime : event.endTime.toDate()
         } else if (event.route?.totalDuration) {
-          // Если есть общая продолжительность маршрута, используем её (в минутах)
           eventEndTime = new Date(eventStartTime.getTime() + event.route.totalDuration * 60 * 1000)
         } else {
-          // Если нет времени окончания и продолжительности, добавляем 3 часа к времени начала (по умолчанию)
-          eventEndTime = new Date(eventStartTime.getTime() + 3 * 60 * 60 * 1000) // +3 часа
+          eventEndTime = new Date(eventStartTime.getTime() + 3 * 60 * 60 * 1000)
         }
 
-        const duration = event.route?.totalDuration ? `${event.route.totalDuration} мин` : '3 часа (по умолчанию)'
+        const duration = event.route?.totalDuration ? `${event.route.totalDuration} min` : '3 hours (default)'
         console.log(`Event "${event.name}": startTime=${eventStartTime.toLocaleString()}, duration=${duration}, endTime=${eventEndTime.toLocaleString()}, now=${now.toLocaleString()}, expired=${eventEndTime < now}`)
 
-        // Событие завершено, если время окончания прошло
         if (eventEndTime < now) {
           console.log(`Completing expired event: ${event.name}`)
           await updateEventStatus(event.id, EventStatus.COMPLETED)

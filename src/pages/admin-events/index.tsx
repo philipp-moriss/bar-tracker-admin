@@ -28,7 +28,6 @@ import { CURRENCIES } from '@/core/constants/currencies';
 import { EventViewModal } from '@/core/components/ui/modals/EventViewModal';
 import { EventEditModal } from '@/core/components/ui/modals/EventEditModal';
 
-// Опции для фильтра статусов
 const statusOptions = [
   { value: 'all', label: 'All Status' },
   { value: EventStatus.ACTIVE, label: 'Active' },
@@ -157,8 +156,6 @@ export const AdminEventsPage = () => {
         await loadEvents();
         AnalyticsService.logCustomEvent('events_auto_completed', { count });
       } else {
-        // Не показываем модалку, если нет просроченных событий
-        // Просто логируем в консоль для отладки
         console.log('No expired active events found. All active events have future dates.');
       }
     } catch (err) {
