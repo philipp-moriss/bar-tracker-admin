@@ -166,33 +166,37 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
 /**
  * Update existing event
  */
-  async function updateEvent(eventData: UpdateEventData): Promise<void> {
-    try {
-      const { id, ...updateData } = eventData
-      const docRef = doc(eventsCollection, id)
+async function updateEvent(eventData: UpdateEventData): Promise<void> {
+  try {
+    const { id, ...updateData } = eventData
+    const docRef = doc(eventsCollection, id)
 
-      // Filter out undefined values
-      const filteredData = Object.fromEntries(
-        Object.entries(updateData).filter(([_, value]) => value !== undefined)
-      )
+    // Filter out undefined values (but keep empty arrays and null)
+    const filteredData = Object.fromEntries(
+      Object.entries(updateData).filter(([_, value]) => value !== undefined)
+    )
 
-      const updatePayload: any = {
-        ...filteredData,
-        updatedAt: Timestamp.fromDate(new Date()),
-      }
-
-      // Convert Date to Timestamp if present
-      if (updatePayload.startTime) {
-        updatePayload.startTime = Timestamp.fromDate(updatePayload.startTime)
-      }
-
-
-      await updateDoc(docRef, updatePayload)
-    } catch (error) {
-      console.error('Error updating event:', error)
-      throw new Error('Failed to update event')
+    const updatePayload: any = {
+      ...filteredData,
+      updatedAt: Timestamp.fromDate(new Date()),
     }
+
+    // Convert Date to Timestamp if present
+    if (updatePayload.startTime) {
+      updatePayload.startTime = Timestamp.fromDate(updatePayload.startTime)
+    }
+
+    console.log('🔥 Updating event:', id);
+    console.log('📦 Update payload assignedBartenders:', updatePayload.assignedBartenders);
+
+    await updateDoc(docRef, updatePayload)
+
+    console.log('✅ Event updated successfully');
+  } catch (error) {
+    console.error('❌ Error updating event:', error)
+    throw new Error('Failed to update event')
   }
+}
 
 /**
  * Delete event
@@ -267,11 +271,11 @@ async function autoCompleteExpiredEvents(): Promise<number> {
         // Умная логика определения времени окончания по времени начала
         const hour = eventStartTime.getHours()
         let defaultDuration = 3 // по умолчанию 3 часа
-        
+
         if (hour >= 18 && hour <= 22) defaultDuration = 4 // вечерние события (18:00-22:00) = 4 часа
         if (hour >= 10 && hour <= 17) defaultDuration = 3 // дневные события (10:00-17:00) = 3 часа  
         if (hour >= 23 || hour <= 6) defaultDuration = 6  // ночные события = 6 часов
-        
+
         if (event.route?.totalDuration) {
           eventEndTime = new Date(eventStartTime.getTime() + event.route.totalDuration * 60 * 1000)
         } else {
