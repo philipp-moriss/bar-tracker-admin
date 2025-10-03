@@ -22,7 +22,8 @@ export interface User {
   totalTickets?: number
   totalSpent?: number
   // Bar assignment for bartenders
-  barName?: string
+  barName?: string // Legacy field - single bar (deprecated)
+  barNames?: string[] // Array of bars for bartenders who work at multiple locations
   // Profile fields merged from profiles collection
   bio?: string
   location?: string
@@ -132,6 +133,8 @@ export interface CreateUserData {
   role: UserRole
   status: UserStatus
   password?: string
+  barName?: string // Legacy - single bar (deprecated)
+  barNames?: string[] // Array of bars for bartenders
 }
 
 export interface UpdateUserData {
@@ -144,5 +147,6 @@ export interface UpdateUserData {
   status?: UserStatus
   isBlocked?: boolean
   blockedReason?: string
-  barName?: string
+  barName?: string // Legacy - single bar (deprecated)
+  barNames?: string[] // Array of bars for bartenders
 }

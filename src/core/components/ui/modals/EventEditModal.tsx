@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MapPin, DollarSign, Globe, Image, MapPin as MapPinIcon } from 'lucide-react';
+import { Calendar, MapPin, DollarSign, Globe, Image, MapPin as MapPinIcon, Users } from 'lucide-react';
 import { BaseModal } from './BaseModal';
 import { FormSection, FormField, FormGrid } from './FormSection';
 import { Input } from '@/core/components/ui/inputs/input';
@@ -11,6 +11,7 @@ import { barService } from '@/core/services/barService';
 import { Bar } from '@/core/types/bar';
 import { CURRENCIES } from '@/core/constants/currencies';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
+import { BartenderSelector } from '@/components/common/BartenderSelector/BartenderSelector';
 
 const getTimezoneByCountry = (country: string): string => {
   const timezoneMap: { [key: string]: string } = {
@@ -94,6 +95,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
   const [bars, setBars] = useState<Bar[]>([]);
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
+  const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
   const [confirmData, setConfirmData] = useState<{
     message: string;
     onConfirm: () => void;
@@ -142,6 +144,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
 
       setEventRoute(event.route);
       setNotificationSettings(event.notificationSettings);
+      setSelectedBartenderIds(event.assignedBartenders || []);
     }
   }, [event]);
 
@@ -216,7 +219,8 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
       const updateData: UpdateEventData = {
         ...formData,
         route: eventRoute,
-        notificationSettings: notificationSettings
+        notificationSettings: notificationSettings,
+        assignedBartenders: selectedBartenderIds.length > 0 ? selectedBartenderIds : undefined
       };
 
       await eventService.updateEvent(updateData);
@@ -556,6 +560,22 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
             </FormField>
           </FormGrid>
         </FormSection>
+
+        {/* Bartender Assignment */}
+        {formData.barName && (
+          <FormSection
+            title="Assign Bartenders"
+            icon={Users}
+            description={`Select which bartenders from ${formData.barName} will be assigned to this event. Only assigned bartenders will see this event in their mobile app.`}
+          >
+            <BartenderSelector
+              barName={formData.barName}
+              selectedBartenderIds={selectedBartenderIds}
+              onSelectionChange={setSelectedBartenderIds}
+              disabled={loading}
+            />
+          </FormSection>
+        )}
 
         {/* Event Route Manager */}
         {bars.length > 0 && (

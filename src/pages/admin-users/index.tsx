@@ -42,6 +42,8 @@ import { AnalyticsService } from '@/core/services/analyticsService';
 import { toast } from 'sonner';
 import { ConfirmModal } from '@/core/components/ui/modals/ConfirmModal';
 import { UserViewModal } from '@/core/components/ui/modals/UserViewModal';
+import { BaseModal } from '@/core/components/ui/modals/BaseModal';
+import { BarMultiSelector } from '@/components/common/BarMultiSelector/BarMultiSelector';
 
 export const AdminUsersPage = () => {
   const navigate = useNavigate();
@@ -58,11 +60,10 @@ export const AdminUsersPage = () => {
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [assignBarModalOpen, setAssignBarModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; role?: UserRole } | null>(null);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string; role?: UserRole; barNames?: string[] } | null>(null);
   const [viewUser, setViewUser] = useState<UserType | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [availableBars, setAvailableBars] = useState<string[]>([]);
-  const [selectedBar, setSelectedBar] = useState<string>('');
+  const [selectedBarNames, setSelectedBarNames] = useState<string[]>([]);
 
   // Load users on component mount
   useEffect(() => {
@@ -107,16 +108,17 @@ export const AdminUsersPage = () => {
 
   const handleAssignBar = async (user: UserType) => {
     try {
-      // Get available bars from bars collection
-      const bars = await barService.getBars({ isActive: true });
-      const barNames = bars.map(bar => bar.name);
-      setAvailableBars(barNames);
-      setSelectedUser({ id: user.id, name: user.name });
-      setSelectedBar(user.barName || '');
+      // Load current bars for this bartender (support both formats)
+      const currentBars = user.barNames && user.barNames.length > 0
+        ? user.barNames
+        : (user.barName ? [user.barName] : []);
+
+      setSelectedUser({ id: user.id, name: user.name, barNames: currentBars });
+      setSelectedBarNames(currentBars);
       setAssignBarModalOpen(true);
     } catch (error) {
-      console.error('Error loading bars:', error);
-      toast.error('Failed to load available bars');
+      console.error('Error opening bar assignment:', error);
+      toast.error('Failed to open bar assignment');
     }
   };
 
@@ -201,22 +203,27 @@ export const AdminUsersPage = () => {
     try {
       setActionLoading(true);
 
-      // Prepare update data - only include barName if it's not empty
-      const updateData: any = {};
-      if (selectedBar && selectedBar.trim() !== '') {
-        updateData.barName = selectedBar.trim();
-      }
+      // Update to new format (barNames array)
+      const updateData: any = {
+        barNames: selectedBarNames.length > 0 ? selectedBarNames : [],
+        // Keep legacy barName field for backward compatibility
+        barName: selectedBarNames.length > 0 ? selectedBarNames[0] : undefined
+      };
 
       await userService.updateUser(selectedUser.id, updateData);
 
-      toast.success(`Bar assigned: ${selectedBar || 'None'}`);
+      const message = selectedBarNames.length === 0
+        ? 'Bars cleared'
+        : `Assigned to ${selectedBarNames.length} bar(s): ${selectedBarNames.join(', ')}`;
+
+      toast.success(message);
       setAssignBarModalOpen(false);
       setSelectedUser(null);
-      setSelectedBar('');
+      setSelectedBarNames([]);
       loadUsers();
     } catch (error) {
-      console.error('Error assigning bar:', error);
-      toast.error('Failed to assign bar');
+      console.error('Error assigning bars:', error);
+      toast.error('Failed to assign bars');
     } finally {
       setActionLoading(false);
     }
@@ -430,15 +437,38 @@ export const AdminUsersPage = () => {
                         </TableCell>
                         <TableCell>
                           {user.role === 'bartender' ? (
-                            user.barName ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                                {user.barName}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                                No bar assigned
-                              </Badge>
-                            )
+                            (() => {
+                              const bars = user.barNames && user.barNames.length > 0
+                                ? user.barNames
+                                : (user.barName ? [user.barName] : []);
+
+                              if (bars.length === 0) {
+                                return (
+                                  <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                                    No bar
+                                  </Badge>
+                                );
+                              }
+
+                              if (bars.length === 1) {
+                                return (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    {bars[0]}
+                                  </Badge>
+                                );
+                              }
+
+                              return (
+                                <div className="flex items-center gap-1" title={bars.join(', ')}>
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 max-w-[120px] truncate">
+                                    {bars[0]}
+                                  </Badge>
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                    +{bars.length - 1}
+                                  </Badge>
+                                </div>
+                              );
+                            })()
                           ) : (
                             <span className="text-barTrekker-darkGrey/50">-</span>
                           )}
@@ -584,60 +614,26 @@ export const AdminUsersPage = () => {
         user={viewUser}
       />
 
-      {/* Assign Bar Modal */}
-      <ConfirmModal
+      {/* Bar Selection Modal */}
+      <BaseModal
         open={assignBarModalOpen}
         onOpenChange={setAssignBarModalOpen}
+        title="Assign Bars to Bartender"
+        description={`Assign bars to "${selectedUser?.name}". Bartender can work at multiple bars.`}
+        showConfirmButton
+        confirmText="Save Bars"
         onConfirm={confirmAssignBar}
         loading={actionLoading}
-        title="Assign Bar to Bartender"
-        description={`Assign a bar to "${selectedUser?.name}"`}
-        confirmText="Assign Bar"
-        variant="default"
-      />
-
-      {/* Bar Selection Modal */}
-      {assignBarModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-96 max-w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4">Assign Bar to Bartender</h3>
-            <p className="text-sm text-gray-600 mb-4">Assign a bar to "{selectedUser?.name}":</p>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Select Bar:</label>
-                <select
-                  value={selectedBar}
-                  onChange={(e) => setSelectedBar(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-barTrekker-orange focus:border-barTrekker-orange"
-                >
-                  <option value="">No bar assigned</option>
-                  {availableBars.map((bar) => (
-                    <option key={bar} value={bar}>
-                      {bar}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setAssignBarModalOpen(false)}
-                  disabled={actionLoading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={confirmAssignBar}
-                  disabled={actionLoading}
-                  className="bg-barTrekker-orange hover:bg-barTrekker-orange/90"
-                >
-                  {actionLoading ? 'Assigning...' : 'Assign Bar'}
-                </Button>
-              </div>
-            </div>
-          </div>
+        size="2xl"
+      >
+        <div className="mt-4">
+          <BarMultiSelector
+            selectedBarNames={selectedBarNames}
+            onSelectionChange={setSelectedBarNames}
+            disabled={actionLoading}
+          />
         </div>
-      )}
+      </BaseModal>
     </AdminLayout>
   );
 };

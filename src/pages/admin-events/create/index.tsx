@@ -34,6 +34,7 @@ import { Bar } from '@/core/types/bar';
 import { AnalyticsService } from '@/core/services/analyticsService';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
 import { CURRENCIES, getCurrencyByCountry } from '@/core/constants/currencies';
+import { BartenderSelector } from '@/components/common/BartenderSelector/BartenderSelector';
 
 const getTimezoneByCountry = (country: string): string => {
   const timezoneMap: { [key: string]: string } = {
@@ -97,6 +98,7 @@ export const CreateEventPage = () => {
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
   const [selectedCurrency, setSelectedCurrency] = useState<string>('gbp');
+  const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
@@ -220,6 +222,8 @@ export const CreateEventPage = () => {
         barPhone: bar.phone || undefined,
         barEmail: bar.email || undefined,
         barWebsite: bar.website || undefined,
+        // Bartender assignment
+        assignedBartenders: selectedBartenderIds.length > 0 ? selectedBartenderIds : undefined,
         images: uploadedImages.map(img => img.url),
         route: eventRoute,
         notificationSettings: notificationSettings,
@@ -323,6 +327,8 @@ export const CreateEventPage = () => {
                               field.onChange(value);
                               const bar = bars.find(b => b.id === value);
                               setSelectedBar(bar);
+                              // Reset bartender selection when bar changes
+                              setSelectedBartenderIds([]);
                             }}
                             options={[
                               { value: '', label: 'Select a bar...' },
@@ -570,6 +576,23 @@ export const CreateEventPage = () => {
                 </div>
 
                 {/* No fallback URL field; primary image is first uploaded image */}
+
+                {/* Bartender Assignment */}
+                {selectedBar && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Assign Bartenders</h3>
+                    <p className="text-sm text-gray-600">
+                      Select which bartenders from {selectedBar.name} will be assigned to this event.
+                      Only assigned bartenders will see this event in their mobile app.
+                    </p>
+                    <BartenderSelector
+                      barName={selectedBar.name}
+                      selectedBartenderIds={selectedBartenderIds}
+                      onSelectionChange={setSelectedBartenderIds}
+                      disabled={loading}
+                    />
+                  </div>
+                )}
 
                 {/* Event Route Manager */}
                 <EventRouteManager

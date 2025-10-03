@@ -321,6 +321,30 @@ export class UserService {
     }
   }
 
+  /**
+   * Get bartenders by bar name
+   * Supports both single bar (barName) and multiple bars (barNames)
+   */
+  async getBartendersByBarName(barName: string): Promise<User[]> {
+    try {
+      // Get all bartenders (client-side filter by barName)
+      const users = await this.getUsers({ role: UserRole.BARTENDER })
+
+      // Filter by barName or barNames array
+      return users.filter(user => {
+        // Check new format (multiple bars)
+        if (user.barNames && Array.isArray(user.barNames)) {
+          return user.barNames.includes(barName)
+        }
+        // Fallback to old format (single bar)
+        return user.barName === barName
+      })
+    } catch (error) {
+      console.error('Error getting bartenders:', error)
+      throw new Error('Failed to fetch bartenders')
+    }
+  }
+
 
 
   /**

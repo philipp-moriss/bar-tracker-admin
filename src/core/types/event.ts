@@ -57,6 +57,8 @@ export interface Event {
   barPhone?: string
   barEmail?: string
   barWebsite?: string
+  // Bartender assignment
+  assignedBartenders?: string[] // Array of bartender user IDs assigned to this event
   status?: EventStatus
   createdAt?: Timestamp | Date
   updatedAt?: Timestamp | Date
@@ -90,6 +92,8 @@ export interface CreateEventData {
   barPhone?: string
   barEmail?: string
   barWebsite?: string
+  // Bartender assignment
+  assignedBartenders?: string[] // Array of bartender user IDs assigned to this event
   // Images
   images?: string[] // URLs of uploaded images
   route?: EventRoute
@@ -99,6 +103,7 @@ export interface CreateEventData {
 export interface UpdateEventData extends Partial<CreateEventData> {
   id: string
   status?: EventStatus
+  assignedBartenders?: string[] // Array of bartender user IDs assigned to this event
 }
 
 export enum EventStatus {
