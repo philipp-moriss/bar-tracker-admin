@@ -166,27 +166,36 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
 /**
  * Update existing event
  */
-async function updateEvent(eventData: UpdateEventData): Promise<void> {
-  try {
-    const { id, ...updateData } = eventData
-    const docRef = doc(eventsCollection, id)
+  async function updateEvent(eventData: UpdateEventData): Promise<void> {
+    try {
+      const { id, ...updateData } = eventData
+      const docRef = doc(eventsCollection, id)
 
-    const updatePayload: any = {
-      ...updateData,
-      updatedAt: Timestamp.fromDate(new Date()),
+      // Filter out undefined values
+      const filteredData = Object.fromEntries(
+        Object.entries(updateData).filter(([_, value]) => value !== undefined)
+      )
+
+      const updatePayload: any = {
+        ...filteredData,
+        updatedAt: Timestamp.fromDate(new Date()),
+      }
+
+      // Convert Date to Timestamp if present
+      if (updatePayload.startTime) {
+        updatePayload.startTime = Timestamp.fromDate(updatePayload.startTime)
+      }
+
+      if (updatePayload.endTime) {
+        updatePayload.endTime = Timestamp.fromDate(updatePayload.endTime)
+      }
+
+      await updateDoc(docRef, updatePayload)
+    } catch (error) {
+      console.error('Error updating event:', error)
+      throw new Error('Failed to update event')
     }
-
-    // Convert Date to Timestamp if present
-    if (updateData.startTime) {
-      updatePayload.startTime = Timestamp.fromDate(updateData.startTime)
-    }
-
-    await updateDoc(docRef, updatePayload)
-  } catch (error) {
-    console.error('Error updating event:', error)
-    throw new Error('Failed to update event')
   }
-}
 
 /**
  * Delete event
