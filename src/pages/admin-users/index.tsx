@@ -394,9 +394,6 @@ export const AdminUsersPage = () => {
                       <TableHead>Contact</TableHead>
                       <TableHead>Role</TableHead>
                       <TableHead>Bar</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Joined</TableHead>
-                      <TableHead>Activity</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -472,27 +469,6 @@ export const AdminUsersPage = () => {
                           ) : (
                             <span className="text-barTrekker-darkGrey/50">-</span>
                           )}
-                        </TableCell>
-                        <TableCell>
-                          {getStatusBadge(user.status, user.isBlocked || false)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-1 text-sm">
-                            <Calendar className="h-3 w-3" />
-                            <span>{formatDate(user.createdAt)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1 text-sm">
-                            <div className="flex items-center space-x-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>{user.totalEvents || 0} events</span>
-                            </div>
-                            <div className="flex items-center space-x-1">
-                              <DollarSign className="h-3 w-3" />
-                              <span>{formatCurrency(user.totalSpent || 0)}</span>
-                            </div>
-                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
