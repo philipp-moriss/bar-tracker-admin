@@ -99,6 +99,7 @@ export const CreateEventPage = () => {
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
   const [selectedCurrency, setSelectedCurrency] = useState<string>('gbp');
   const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Защита от двойной отправки
 
   useEffect(() => {
     if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
@@ -187,14 +188,25 @@ export const CreateEventPage = () => {
   }, []);
 
   const onSubmit = async (data: CreateEventFormData) => {
+    // Защита от повторной отправки
+    if (isSubmitting) {
+      console.log('⚠️ Event creation already in progress, ignoring duplicate submit');
+      return;
+    }
+
     try {
+      setIsSubmitting(true);
       setLoading(true);
       setError(null);
+
+      console.log('🚀 Starting event creation...');
 
       // Find selected bar
       const bar = bars.find(b => b.id === data.barId);
       if (!bar) {
         setError('Selected bar not found');
+        setLoading(false);
+        setIsSubmitting(false);
         return;
       }
 
@@ -229,7 +241,11 @@ export const CreateEventPage = () => {
         notificationSettings: notificationSettings,
       };
 
-      await eventService.createEvent(eventData);
+      console.log('📝 Event data prepared:', { name: eventData.name, barName: eventData.barName });
+
+      const createdEvent = await eventService.createEvent(eventData);
+      
+      console.log('✅ Event created successfully with ID:', createdEvent.id);
 
       AnalyticsService.logCustomEvent('event_created', {
         eventName: data.name,
@@ -238,12 +254,17 @@ export const CreateEventPage = () => {
         barName: bar.name
       });
 
-      navigate('/admin/events');
-    } catch (err) {
-      setError('Failed to create event');
-      console.error('Error creating event:', err);
-    } finally {
+      console.log('🔄 Navigating to events list...');
+      
+      // Сбрасываем loading перед навигацией
       setLoading(false);
+      setIsSubmitting(false);
+      navigate('/admin/events');
+    } catch (err: any) {
+      console.error('❌ Error creating event:', err);
+      setError(err?.message || 'Failed to create event. Please try again.');
+      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 

@@ -117,7 +117,9 @@ async function getEventById(id: string): Promise<Event | null> {
  */
 async function createEvent(eventData: CreateEventData): Promise<Event> {
   try {
+    console.log('🔵 createEvent: Starting event creation...')
     const now = new Date()
+    
     // Remove undefined values deeply (objects/arrays)
     const removeUndefinedDeep = (input: any): any => {
       if (Array.isArray(input)) {
@@ -137,6 +139,7 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
     }
 
     const sanitized = removeUndefinedDeep(eventData)
+    console.log('🔵 createEvent: Data sanitized')
 
     const eventToCreate = {
       ...sanitized,
@@ -147,7 +150,9 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
       updatedAt: Timestamp.fromDate(now),
     }
 
+    console.log('🔵 createEvent: Adding document to Firestore...')
     const docRef = await addDoc(eventsCollection, eventToCreate)
+    console.log('🟢 createEvent: Document added successfully with ID:', docRef.id)
 
     return {
       id: docRef.id,
@@ -157,9 +162,14 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
       createdAt: now,
       updatedAt: now,
     }
-  } catch (error) {
-    console.error('Error creating event:', error)
-    throw new Error('Failed to create event')
+  } catch (error: any) {
+    console.error('🔴 createEvent: Error creating event:', error)
+    console.error('🔴 createEvent: Error details:', {
+      code: error?.code,
+      message: error?.message,
+      stack: error?.stack
+    })
+    throw new Error(`Failed to create event: ${error?.message || 'Unknown error'}`)
   }
 }
 
@@ -168,7 +178,15 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
  */
 async function updateEvent(eventData: UpdateEventData): Promise<void> {
   try {
+    console.log('🟡 updateEvent: Starting update for event ID:', eventData.id)
+    console.log('🟡 updateEvent: Called from:', new Error().stack?.split('\n')[2]) // Показываем откуда вызвана
+    
     const { id, ...updateData } = eventData
+    
+    if (!id) {
+      throw new Error('Event ID is required for update')
+    }
+    
     const docRef = doc(eventsCollection, id)
 
     // Filter out undefined values (but keep empty arrays and null)
@@ -186,15 +204,20 @@ async function updateEvent(eventData: UpdateEventData): Promise<void> {
       updatePayload.startTime = Timestamp.fromDate(updatePayload.startTime)
     }
 
-    console.log('🔥 Updating event:', id);
-    console.log('📦 Update payload assignedBartenders:', updatePayload.assignedBartenders);
+    console.log('🟡 updateEvent: Payload prepared, updating Firestore...');
+    console.log('📦 updateEvent: assignedBartenders:', updatePayload.assignedBartenders);
 
     await updateDoc(docRef, updatePayload)
 
-    console.log('✅ Event updated successfully');
-  } catch (error) {
-    console.error('❌ Error updating event:', error)
-    throw new Error('Failed to update event')
+    console.log('🟢 updateEvent: Event updated successfully');
+  } catch (error: any) {
+    console.error('🔴 updateEvent: Error updating event:', error)
+    console.error('🔴 updateEvent: Error details:', {
+      code: error?.code,
+      message: error?.message,
+      eventId: eventData.id
+    })
+    throw new Error(`Failed to update event: ${error?.message || 'Unknown error'}`)
   }
 }
 
