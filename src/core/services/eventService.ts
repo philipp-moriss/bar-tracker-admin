@@ -8,7 +8,8 @@ import {
   deleteDoc,
   query,
   where,
-  Timestamp
+  Timestamp,
+  getDocsFromServer
 } from 'firebase/firestore'
 import { db } from '@/modules/firebase/config'
 import { Event, CreateEventData, UpdateEventData, EventFilters, EventStats, EventStatus } from '@/core/types/event'
@@ -38,7 +39,8 @@ async function getEvents(filters?: EventFilters): Promise<Event[]> {
       q = query(q, where('startTime', '<=', Timestamp.fromDate(filters.dateTo)))
     }
 
-    const snapshot = await getDocs(q)
+    // Use getDocsFromServer to bypass cache and get fresh data
+    const snapshot = await getDocsFromServer(q)
     let events = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
@@ -119,7 +121,7 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
   try {
     console.log('🔵 createEvent: Starting event creation...')
     const now = new Date()
-    
+
     // Remove undefined values deeply (objects/arrays)
     const removeUndefinedDeep = (input: any): any => {
       if (Array.isArray(input)) {
@@ -180,13 +182,13 @@ async function updateEvent(eventData: UpdateEventData): Promise<void> {
   try {
     console.log('🟡 updateEvent: Starting update for event ID:', eventData.id)
     console.log('🟡 updateEvent: Called from:', new Error().stack?.split('\n')[2]) // Показываем откуда вызвана
-    
+
     const { id, ...updateData } = eventData
-    
+
     if (!id) {
       throw new Error('Event ID is required for update')
     }
-    
+
     const docRef = doc(eventsCollection, id)
 
     // Filter out undefined values (but keep empty arrays and null)
