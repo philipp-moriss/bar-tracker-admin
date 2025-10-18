@@ -144,7 +144,7 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
     const eventToCreate = {
       ...sanitized,
       startTime: eventData.startTime ? Timestamp.fromDate(eventData.startTime) : undefined,
-      status: eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE,
+      status: eventData.status || (eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE),
       rating: 0,
       createdAt: Timestamp.fromDate(now),
       updatedAt: Timestamp.fromDate(now),
@@ -157,7 +157,7 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
     return {
       id: docRef.id,
       ...eventData,
-      status: eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE,
+      status: eventData.status || (eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE),
       rating: 0,
       createdAt: now,
       updatedAt: now,

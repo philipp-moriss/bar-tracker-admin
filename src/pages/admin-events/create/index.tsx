@@ -29,7 +29,7 @@ import { Textarea } from '@/core/components/ui/inputs/textarea';
 import { FormSelect } from '@/core/components/ui/inputs/FormSelect';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
-import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation } from '@/core/types/event';
+import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation, EventStatus } from '@/core/types/event';
 import { Bar } from '@/core/types/bar';
 import { AnalyticsService } from '@/core/services/analyticsService';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
@@ -88,6 +88,8 @@ const createEventSchema = z.object({
   isRecurring: z.boolean().optional(),
   recurringTime: z.string().optional(),
   recurringDays: z.array(z.number()).optional(),
+  // Status
+  status: z.nativeEnum(EventStatus).optional(),
 }).refine((data) => {
   // If not recurring, startTime is required
   if (!data.isRecurring && !data.startTime) {
@@ -182,6 +184,7 @@ export const CreateEventPage = () => {
       isRecurring: false,
       recurringTime: '19:00',
       recurringDays: [0, 1, 2, 3, 4, 5, 6], // Default to all days for daily schedule
+      status: EventStatus.ACTIVE, // Default status
     },
   });
 
@@ -191,6 +194,19 @@ export const CreateEventPage = () => {
       form.setValue('recurringDays', selectedDays);
     }
   }, [selectedDays, isRecurring, scheduleType, form]);
+
+  // Auto-update status based on event type
+  useEffect(() => {
+    if (isRecurring) {
+      form.setValue('status', EventStatus.PERMANENT);
+    } else {
+      // Only set to ACTIVE if current status is PERMANENT (to avoid overriding DRAFT)
+      const currentStatus = form.getValues('status');
+      if (currentStatus === EventStatus.PERMANENT) {
+        form.setValue('status', EventStatus.ACTIVE);
+      }
+    }
+  }, [isRecurring, form]);
 
   useEffect(() => {
     if (selectedBar) {
@@ -286,6 +302,8 @@ export const CreateEventPage = () => {
         isRecurring: data.isRecurring || false,
         recurringTime: data.recurringTime,
         recurringDays: data.recurringDays,
+        // Status
+        status: data.status || EventStatus.ACTIVE,
       };
 
       console.log('📝 Event data prepared:', { name: eventData.name, barName: eventData.barName });
@@ -583,7 +601,31 @@ export const CreateEventPage = () => {
                     )}
                   />
 
-                  {/* startLocationName is auto-filled from selected bar; field hidden */}
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                          Status *
+                        </FormLabel>
+                        <FormControl>
+                          <FormSelect
+                            value={field.value || EventStatus.ACTIVE}
+                            onValueChange={field.onChange}
+                            options={[
+                              { value: EventStatus.DRAFT, label: 'Draft' },
+                              { value: EventStatus.ACTIVE, label: 'Active' },
+                              { value: EventStatus.PERMANENT, label: 'Permanent (Recurring)' },
+                            ]}
+                            placeholder="Select status..."
+                            allowEmpty={false}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 {/* Coordinates are derived from selected bar automatically */}

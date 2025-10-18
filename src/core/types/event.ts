@@ -100,6 +100,8 @@ export interface CreateEventData {
   isRecurring?: boolean // Whether this is a recurring event
   recurringTime?: string // Time for recurring events (e.g., "19:00")
   recurringDays?: number[] // Days of week for recurring events (0=Sunday, 1=Monday, etc.)
+  // Status
+  status?: EventStatus // Event status (DRAFT, ACTIVE, PERMANENT, etc.)
   // Images
   images?: string[] // URLs of uploaded images
   route?: EventRoute

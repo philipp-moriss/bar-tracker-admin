@@ -160,6 +160,18 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
     }
   }, [event]);
 
+  // Auto-update status based on event type
+  useEffect(() => {
+    if (isRecurring) {
+      setFormData(prev => ({ ...prev, status: EventStatus.PERMANENT }));
+    } else {
+      // Only set to ACTIVE if current status is PERMANENT (to avoid overriding DRAFT)
+      if (formData.status === EventStatus.PERMANENT) {
+        setFormData(prev => ({ ...prev, status: EventStatus.ACTIVE }));
+      }
+    }
+  }, [isRecurring]);
+
   // Sync scheduleType with selectedDays
   useEffect(() => {
     if (isRecurring) {
@@ -398,6 +410,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
                 options={[
                   { value: EventStatus.DRAFT, label: 'Draft' },
                   { value: EventStatus.ACTIVE, label: 'Active' },
+                  { value: EventStatus.PERMANENT, label: 'Permanent (Recurring)' },
                   { value: EventStatus.COMPLETED, label: 'Completed' },
                   { value: EventStatus.CANCELLED, label: 'Cancelled' }
                 ]}
