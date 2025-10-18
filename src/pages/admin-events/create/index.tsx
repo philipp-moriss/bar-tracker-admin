@@ -597,8 +597,8 @@ export const CreateEventPage = () => {
                     {/* One-time Event Option */}
                     <div
                       className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${!isRecurring
-                          ? 'border-barTrekker-orange bg-orange-50 shadow-md'
-                          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                        ? 'border-barTrekker-orange bg-orange-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                         }`}
                       onClick={() => {
                         setIsRecurring(false);
@@ -607,8 +607,8 @@ export const CreateEventPage = () => {
                     >
                       <div className="flex items-start space-x-3">
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${!isRecurring
-                            ? 'border-barTrekker-orange bg-barTrekker-orange'
-                            : 'border-gray-300'
+                          ? 'border-barTrekker-orange bg-barTrekker-orange'
+                          : 'border-gray-300'
                           }`}>
                           {!isRecurring && (
                             <div className="w-2 h-2 bg-white rounded-full"></div>
@@ -639,8 +639,8 @@ export const CreateEventPage = () => {
                     {/* Recurring Event Option */}
                     <div
                       className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${isRecurring
-                          ? 'border-barTrekker-orange bg-orange-50 shadow-md'
-                          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                        ? 'border-barTrekker-orange bg-orange-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
                         }`}
                       onClick={() => {
                         setIsRecurring(true);
@@ -649,8 +649,8 @@ export const CreateEventPage = () => {
                     >
                       <div className="flex items-start space-x-3">
                         <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${isRecurring
-                            ? 'border-barTrekker-orange bg-barTrekker-orange'
-                            : 'border-gray-300'
+                          ? 'border-barTrekker-orange bg-barTrekker-orange'
+                          : 'border-gray-300'
                           }`}>
                           {isRecurring && (
                             <div className="w-2 h-2 bg-white rounded-full"></div>
