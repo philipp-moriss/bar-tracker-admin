@@ -10,7 +10,8 @@ import {
   Bell,
   Menu,
   X,
-  Bug
+  Bug,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/core/components/ui/button';
 import { cn } from '@/core/lib/utils';
@@ -68,6 +69,12 @@ const navigationItems = [
     href: '/admin/debug',
     icon: Bug,
     description: 'Firebase diagnostics'
+  },
+  {
+    name: 'Cleanup',
+    href: '/admin/cleanup',
+    icon: Trash2,
+    description: 'Clean expired tickets'
   }
 ];
 

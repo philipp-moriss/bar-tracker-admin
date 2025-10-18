@@ -26,9 +26,13 @@ export const EventViewModal: React.FC<EventViewModalProps> = ({
       [EventStatus.COMPLETED]: { label: 'Completed', variant: 'secondary' as const },
       [EventStatus.CANCELLED]: { label: 'Cancelled', variant: 'destructive' as const },
       [EventStatus.DRAFT]: { label: 'Draft', variant: 'outline' as const },
+      [EventStatus.PERMANENT]: { label: 'Permanent', variant: 'default' as const },
     };
 
     const config = statusConfig[status];
+    if (!config) {
+      return <Badge variant="outline">Unknown</Badge>;
+    }
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 

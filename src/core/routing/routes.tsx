@@ -16,6 +16,7 @@ import { ProtectedRoute } from "@/core/routing/ProtectedRoute";
 import { createBrowserRouter } from "react-router-dom";
 import NotificationsPage from "@/pages/notifications";
 import { AdminSettingsPage } from "@/pages/admin-settings";
+import { AdminCleanupPage } from "@/pages/admin-cleanup";
 
 export const router = createBrowserRouter([
   {
@@ -154,6 +155,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <NotificationsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "cleanup",
+        element: (
+          <ProtectedRoute>
+            <AdminCleanupPage />
           </ProtectedRoute>
         ),
       },

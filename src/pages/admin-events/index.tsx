@@ -33,10 +33,10 @@ const statusOptions = [
   { value: EventStatus.ACTIVE, label: 'Active' },
   { value: EventStatus.COMPLETED, label: 'Completed' },
   { value: EventStatus.CANCELLED, label: 'Cancelled' },
-  { value: EventStatus.DRAFT, label: 'Draft' }
+  { value: EventStatus.DRAFT, label: 'Draft' },
+  { value: EventStatus.PERMANENT, label: 'Permanent' }
 ];
 import { DeleteConfirmModal } from '@/core/components/ui/modals/DeleteConfirmModal';
-import { EventInfoModal } from '@/core/components/ui/modals/EventInfoModal';
 
 export const AdminEventsPage = () => {
   const navigate = useNavigate();
@@ -55,8 +55,7 @@ export const AdminEventsPage = () => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [autoCompleteLoading, setAutoCompleteLoading] = useState(false);
-  const [infoModalOpen, setInfoModalOpen] = useState(false);
-  const [infoModalMessage, setInfoModalMessage] = useState('');
+
 
   // Load events on component mount
   useEffect(() => {
@@ -141,6 +140,7 @@ export const AdminEventsPage = () => {
     }
   };
 
+
   const handleEventSaved = () => {
     loadEvents();
   };
@@ -166,13 +166,13 @@ export const AdminEventsPage = () => {
     }
   };
 
-
   const getStatusBadge = (status: EventStatus) => {
     const statusConfig = {
       [EventStatus.ACTIVE]: { label: 'Active', variant: 'default' as const },
       [EventStatus.COMPLETED]: { label: 'Completed', variant: 'secondary' as const },
       [EventStatus.CANCELLED]: { label: 'Cancelled', variant: 'destructive' as const },
       [EventStatus.DRAFT]: { label: 'Draft', variant: 'outline' as const },
+      [EventStatus.PERMANENT]: { label: 'Permanent', variant: 'default' as const },
     };
 
     const config = statusConfig[status];
@@ -298,7 +298,7 @@ export const AdminEventsPage = () => {
                       </TableHead>
                       <TableHead>
                         <button className="flex items-center gap-1" onClick={() => toggleSort('startTime')}>
-                          Date & Time
+                          Schedule
                           {sortBy === 'startTime' && (
                             <span className="text-xs text-gray-500">{sortDir === 'asc' ? '↑' : '↓'}</span>
                           )}
@@ -344,7 +344,18 @@ export const AdminEventsPage = () => {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            {formatDate(event.startTime)}
+                            {event.isRecurring ? (
+                              <div>
+                                <div className="font-medium text-barTrekker-orange">Recurring</div>
+                                <div className="text-xs text-gray-500">
+                                  {event.recurringTime} {event.recurringDays && event.recurringDays.length > 0 && (
+                                    <span>• {event.recurringDays.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              formatDate(event.startTime)
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
@@ -427,12 +438,6 @@ export const AdminEventsPage = () => {
           textKey={`Are you sure you want to delete "${selectedEvent?.name}"?`}
         />
 
-        {/* Info Modal */}
-        <EventInfoModal
-          open={infoModalOpen}
-          onOpenChange={setInfoModalOpen}
-          message={infoModalMessage}
-        />
       </div>
     </AdminLayout>
   );

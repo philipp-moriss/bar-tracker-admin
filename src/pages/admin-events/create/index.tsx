@@ -82,8 +82,25 @@ const createEventSchema = z.object({
   country: z.string().min(1, "Country is required"),
   startLocationName: z.string().optional(),
   includedDescription: z.string().optional(),
-  startTime: z.string().min(1, "Start time is required"),
+  startTime: z.string().optional(),
   barId: z.string().min(1, "Please select a bar"),
+  // Recurring event fields
+  isRecurring: z.boolean().optional(),
+  recurringTime: z.string().optional(),
+  recurringDays: z.array(z.number()).optional(),
+}).refine((data) => {
+  // If not recurring, startTime is required
+  if (!data.isRecurring && !data.startTime) {
+    return false;
+  }
+  // If recurring, recurringTime and recurringDays are required
+  if (data.isRecurring && (!data.recurringTime || !data.recurringDays || data.recurringDays.length === 0)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "For one-time events, start time is required. For recurring events, recurring time and days are required.",
+  path: ["startTime"]
 });
 
 type CreateEventFormData = z.infer<typeof createEventSchema>;
@@ -100,6 +117,11 @@ export const CreateEventPage = () => {
   const [selectedCurrency, setSelectedCurrency] = useState<string>('gbp');
   const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false); // Защита от двойной отправки
+  // Recurring event state
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [recurringTime, setRecurringTime] = useState<string>('19:00');
+  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]); // Default to all days
+  const [scheduleType, setScheduleType] = useState<'daily' | 'custom'>('daily');
 
   useEffect(() => {
     if (selectedBar && (!eventRoute || eventRoute.locations.length === 0)) {
@@ -134,6 +156,17 @@ export const CreateEventPage = () => {
     }
   }, [selectedBar, eventRoute]);
 
+  // Sync scheduleType with selectedDays
+  useEffect(() => {
+    if (isRecurring) {
+      if (scheduleType === 'daily') {
+        // Set all days for daily schedule
+        const allDays = [0, 1, 2, 3, 4, 5, 6];
+        setSelectedDays(allDays);
+      }
+    }
+  }, [scheduleType, isRecurring]);
+
   const form = useForm<CreateEventFormData>({
     resolver: zodResolver(createEventSchema),
     defaultValues: {
@@ -146,8 +179,18 @@ export const CreateEventPage = () => {
       includedDescription: '',
       startTime: '',
       barId: '',
+      isRecurring: false,
+      recurringTime: '19:00',
+      recurringDays: [0, 1, 2, 3, 4, 5, 6], // Default to all days for daily schedule
     },
   });
+
+  // Sync selectedDays with form when scheduleType changes
+  useEffect(() => {
+    if (isRecurring && scheduleType === 'daily') {
+      form.setValue('recurringDays', selectedDays);
+    }
+  }, [selectedDays, isRecurring, scheduleType, form]);
 
   useEffect(() => {
     if (selectedBar) {
@@ -219,7 +262,7 @@ export const CreateEventPage = () => {
         country: data.country,
         startLocationName: data.startLocationName || bar.name,
         includedDescription: data.includedDescription || '',
-        startTime: new Date(data.startTime),
+        startTime: data.startTime ? new Date(data.startTime) : undefined,
         timezone: getTimezoneByCountry(data.country),
         imageURL: primaryImage,
         startLocation: {
@@ -239,12 +282,16 @@ export const CreateEventPage = () => {
         images: uploadedImages.map(img => img.url),
         route: eventRoute,
         notificationSettings: notificationSettings,
+        // Recurring event fields
+        isRecurring: data.isRecurring || false,
+        recurringTime: data.recurringTime,
+        recurringDays: data.recurringDays,
       };
 
       console.log('📝 Event data prepared:', { name: eventData.name, barName: eventData.barName });
 
       const createdEvent = await eventService.createEvent(eventData);
-      
+
       console.log('✅ Event created successfully with ID:', createdEvent.id);
 
       AnalyticsService.logCustomEvent('event_created', {
@@ -255,7 +302,7 @@ export const CreateEventPage = () => {
       });
 
       console.log('🔄 Navigating to events list...');
-      
+
       // Сбрасываем loading перед навигацией
       setLoading(false);
       setIsSubmitting(false);
@@ -541,27 +588,342 @@ export const CreateEventPage = () => {
 
                 {/* Coordinates are derived from selected bar automatically */}
 
-                {/* Date and Time */}
-                <FormField
-                  control={form.control}
-                  name="startTime"
-                  render={({ field }) => (
-                    <FormItem>
+                {/* Event Type Selection */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Event Type</h3>
+
+                  {/* Beautiful Card-based Event Type Selection */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* One-time Event Option */}
+                    <div
+                      className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${!isRecurring
+                          ? 'border-barTrekker-orange bg-orange-50 shadow-md'
+                          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                        }`}
+                      onClick={() => {
+                        setIsRecurring(false);
+                        form.setValue('isRecurring', false);
+                      }}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${!isRecurring
+                            ? 'border-barTrekker-orange bg-barTrekker-orange'
+                            : 'border-gray-300'
+                          }`}>
+                          {!isRecurring && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                            <h3 className="text-sm font-semibold text-gray-900">One-time Event</h3>
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            A single event with a specific date and time. Perfect for special occasions, launches, or unique experiences.
+                          </p>
+                          <div className="mt-2 flex items-center space-x-1">
+                            <div className="w-6 h-6 bg-gray-100 text-gray-600 text-xs rounded-full flex items-center justify-center font-medium">
+                              📅
+                            </div>
+                            <span className="text-xs text-gray-500">Single date</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recurring Event Option */}
+                    <div
+                      className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${isRecurring
+                          ? 'border-barTrekker-orange bg-orange-50 shadow-md'
+                          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                        }`}
+                      onClick={() => {
+                        setIsRecurring(true);
+                        form.setValue('isRecurring', true);
+                      }}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${isRecurring
+                            ? 'border-barTrekker-orange bg-barTrekker-orange'
+                            : 'border-gray-300'
+                          }`}>
+                          {isRecurring && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </div>
+                            <h3 className="text-sm font-semibold text-gray-900">Recurring Event (Daily)</h3>
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            Event runs every day at the specified time. Customers can buy tickets for specific dates. Perfect for regular tours and activities.
+                          </p>
+                          <div className="mt-2 flex items-center space-x-1">
+                            <div className="w-6 h-6 bg-barTrekker-orange text-white text-xs rounded-full flex items-center justify-center font-medium">
+                              🔄
+                            </div>
+                            <span className="text-xs text-gray-500">Daily recurring</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date and Time - Only for one-time events */}
+                {!isRecurring && (
+                  <FormField
+                    control={form.control}
+                    name="startTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                          Start Date & Time *
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="datetime-local"
+                            lang="en-GB"
+                            className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Recurring Event Settings */}
+                {isRecurring && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Recurring Event Settings</h3>
+
+                    {/* Recurring Time */}
+                    <FormField
+                      control={form.control}
+                      name="recurringTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                            Event Time *
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="time"
+                              value={recurringTime}
+                              onChange={(e) => {
+                                setRecurringTime(e.target.value);
+                                field.onChange(e.target.value);
+                              }}
+                              className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Schedule Type */}
+                    <div className="space-y-4">
                       <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
-                        Start Date & Time *
+                        Schedule Type *
                       </FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="datetime-local"
-                          lang="en-GB"
-                          className="bg-barTrekker-lightGrey border-barTrekker-lightGrey focus:border-barTrekker-orange focus:ring-barTrekker-orange"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+
+                      {/* Beautiful Card-based Selection */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Daily Option */}
+                        <div
+                          className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${scheduleType === 'daily'
+                            ? 'border-barTrekker-orange bg-orange-50 shadow-md'
+                            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                            }`}
+                          onClick={() => setScheduleType('daily')}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${scheduleType === 'daily'
+                              ? 'border-barTrekker-orange bg-barTrekker-orange'
+                              : 'border-gray-300'
+                              }`}>
+                              {scheduleType === 'daily' && (
+                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
+                                <h3 className="text-sm font-semibold text-gray-900">Daily (Every Day)</h3>
+                              </div>
+                              <p className="text-xs text-gray-600 leading-relaxed">
+                                Event runs every day of the week at the specified time. Perfect for regular tours and activities.
+                              </p>
+                              <div className="mt-2 flex items-center space-x-1">
+                                {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                                  <div key={day} className="w-6 h-6 bg-barTrekker-orange text-white text-xs rounded-full flex items-center justify-center font-medium">
+                                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'][day]}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Custom Option */}
+                        <div
+                          className={`relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${scheduleType === 'custom'
+                            ? 'border-barTrekker-orange bg-orange-50 shadow-md'
+                            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                            }`}
+                          onClick={() => setScheduleType('custom')}
+                        >
+                          <div className="flex items-start space-x-3">
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-0.5 ${scheduleType === 'custom'
+                              ? 'border-barTrekker-orange bg-barTrekker-orange'
+                              : 'border-gray-300'
+                              }`}>
+                              {scheduleType === 'custom' && (
+                                <div className="w-2 h-2 bg-white rounded-full"></div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                </div>
+                                <h3 className="text-sm font-semibold text-gray-900">Custom Schedule</h3>
+                              </div>
+                              <p className="text-xs text-gray-600 leading-relaxed">
+                                Choose specific days when the event is available. Great for weekend-only or weekday-only events.
+                              </p>
+                              <div className="mt-2 flex items-center space-x-1">
+                                {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                                  <div key={day} className={`w-6 h-6 text-xs rounded-full flex items-center justify-center font-medium ${selectedDays.includes(day)
+                                    ? 'bg-barTrekker-orange text-white'
+                                    : 'bg-gray-100 text-gray-400'
+                                    }`}>
+                                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'][day]}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Custom Days Selection - Only show when custom schedule is selected */}
+                    {scheduleType === 'custom' && (
+                      <div className="space-y-4">
+                        <FormLabel className="text-sm font-medium text-barTrekker-darkGrey">
+                          Select Days *
+                        </FormLabel>
+
+                        {/* Beautiful Day Selection */}
+                        <div className="bg-gray-50 rounded-lg p-4">
+                          <div className="grid grid-cols-7 gap-3">
+                            {[
+                              { value: 0, label: 'Sun', fullLabel: 'Sunday' },
+                              { value: 1, label: 'Mon', fullLabel: 'Monday' },
+                              { value: 2, label: 'Tue', fullLabel: 'Tuesday' },
+                              { value: 3, label: 'Wed', fullLabel: 'Wednesday' },
+                              { value: 4, label: 'Thu', fullLabel: 'Thursday' },
+                              { value: 5, label: 'Fri', fullLabel: 'Friday' },
+                              { value: 6, label: 'Sat', fullLabel: 'Saturday' }
+                            ].map((day) => {
+                              const isSelected = selectedDays.includes(day.value);
+                              return (
+                                <div
+                                  key={day.value}
+                                  className={`relative cursor-pointer transition-all duration-200 ${isSelected
+                                    ? 'transform scale-105'
+                                    : 'hover:scale-102'
+                                    }`}
+                                  onClick={() => {
+                                    const newDays = isSelected
+                                      ? selectedDays.filter(d => d !== day.value)
+                                      : [...selectedDays, day.value];
+                                    setSelectedDays(newDays);
+                                    form.setValue('recurringDays', newDays);
+                                  }}
+                                >
+                                  <div className={`w-full h-20 rounded-lg border-2 flex flex-col items-center justify-center space-y-1 transition-all duration-200 ${isSelected
+                                    ? 'border-barTrekker-orange bg-barTrekker-orange text-white shadow-lg'
+                                    : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:shadow-md'
+                                    }`}>
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isSelected
+                                      ? 'bg-white text-barTrekker-orange'
+                                      : 'bg-gray-100 text-gray-600'
+                                      }`}>
+                                      {day.label}
+                                    </div>
+                                    <span className={`text-xs font-medium ${isSelected ? 'text-white' : 'text-gray-600'
+                                      }`}>
+                                      {day.fullLabel}
+                                    </span>
+                                    {isSelected && (
+                                      <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Selection Summary */}
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-gray-600">
+                                Selected: {selectedDays.length} day{selectedDays.length !== 1 ? 's' : ''}
+                              </span>
+                              {selectedDays.length > 0 && (
+                                <div className="flex items-center space-x-1">
+                                  <span className="text-xs text-gray-500">Days:</span>
+                                  <div className="flex space-x-1">
+                                    {selectedDays.sort().map(day => (
+                                      <span key={day} className="px-2 py-1 bg-barTrekker-orange text-white text-xs rounded-full font-medium">
+                                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {selectedDays.length === 0 && (
+                          <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            <p className="text-sm text-red-600 font-medium">Please select at least one day for your event</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Additional Information */}
                 <FormField

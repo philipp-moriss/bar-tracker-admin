@@ -100,6 +100,12 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
     onConfirm: () => void;
   } | null>(null);
 
+  // Recurring event state
+  const [isRecurring, setIsRecurring] = useState<boolean>(false);
+  const [recurringTime, setRecurringTime] = useState<string>('19:00');
+  const [selectedDays, setSelectedDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]); // Default to all days
+  const [scheduleType, setScheduleType] = useState<'daily' | 'custom'>('daily');
+
   useEffect(() => {
     const loadBars = async () => {
       try {
@@ -124,7 +130,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         currency: event.currency || 'gbp',
         description: event.description,
         imageURL: event.imageURL,
-        startTime: event.startTime instanceof Date ? event.startTime : event.startTime.toDate(),
+        startTime: event.startTime instanceof Date ? event.startTime : event.startTime?.toDate(),
         country: event.country,
         includedDescription: event.includedDescription,
         startLocationName: event.startLocationName,
@@ -140,11 +146,30 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         status: event.status || EventStatus.DRAFT
       });
 
+      // Load recurring event data
+      setIsRecurring(event.isRecurring || false);
+      setRecurringTime(event.recurringTime || '19:00');
+      const days = event.recurringDays || [0, 1, 2, 3, 4, 5, 6];
+      setSelectedDays(days);
+      // Determine schedule type based on days
+      setScheduleType(days.length === 7 ? 'daily' : 'custom');
+
       setEventRoute(event.route);
       setNotificationSettings(event.notificationSettings);
       setSelectedBartenderIds(event.assignedBartenders || []);
     }
   }, [event]);
+
+  // Sync scheduleType with selectedDays
+  useEffect(() => {
+    if (isRecurring) {
+      if (scheduleType === 'daily') {
+        // Set all days for daily schedule
+        const allDays = [0, 1, 2, 3, 4, 5, 6];
+        setSelectedDays(allDays);
+      }
+    }
+  }, [scheduleType, isRecurring]);
 
   const handleInputChange = (field: keyof UpdateEventData, value: unknown) => {
     setFormData(prev => {
@@ -218,7 +243,15 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         ...formData,
         route: eventRoute,
         notificationSettings: notificationSettings,
-        assignedBartenders: selectedBartenderIds.length > 0 ? selectedBartenderIds : []
+        assignedBartenders: selectedBartenderIds.length > 0 ? selectedBartenderIds : [],
+        // Recurring event fields
+        isRecurring: isRecurring,
+        recurringTime: isRecurring ? recurringTime : undefined,
+        recurringDays: isRecurring ? selectedDays : undefined,
+        // Clear startTime for recurring events
+        startTime: isRecurring ? undefined : formData.startTime,
+        // Auto-set status based on recurring type
+        status: isRecurring ? EventStatus.PERMANENT : formData.status,
       };
 
       console.log('💾 Saving event with assignedBartenders:', selectedBartenderIds);
@@ -259,14 +292,14 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
       onOpenChange={onOpenChange}
       title="Edit Event"
       size="4xl"
-      className="max-h-[80vh] overflow-y-auto"
+      className="max-h-[90vh]"
       showConfirmButton
       confirmText="Save Changes"
       confirmClassName="bg-barTrekker-orange hover:bg-barTrekker-orange/90"
       onConfirm={handleSave}
       loading={loading}
     >
-      <div className="space-y-8">
+      <div className="max-h-[70vh] overflow-y-auto space-y-8">
         {error && (
           <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 text-sm">{error}</p>
@@ -315,18 +348,22 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
               </div>
             </FormField>
 
-            <FormField label="Start Date & Time" required>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="datetime-local"
-                  lang="en-GB"
-                  value={formatDateForInput(formData.startTime)}
-                  onChange={(e) => handleInputChange('startTime', new Date(e.target.value))}
-                  className="pl-10"
-                />
-              </div>
-            </FormField>
+            {/* Date and Time - Only for one-time events */}
+            {!isRecurring && (
+              <FormField label="Start Date & Time" required>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="datetime-local"
+                    lang="en-GB"
+                    value={formatDateForInput(formData.startTime)}
+                    onChange={(e) => handleInputChange('startTime', new Date(e.target.value))}
+                    className="pl-10"
+                  />
+                </div>
+              </FormField>
+            )}
+
 
 
 
@@ -397,6 +434,159 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
               })()}
             </FormField>
           </FormGrid>
+
+          {/* Event Type Selection */}
+          <div className="mt-6">
+            <FormField label="Event Type" required>
+              <div className="flex space-x-4">
+                <label className="flex-1 cursor-pointer">
+                  <div className={`p-4 border rounded-lg transition-colors ${!isRecurring
+                    ? 'border-barTrekker-orange bg-orange-50'
+                    : 'border-barTrekker-lightGrey bg-white hover:border-barTrekker-darkGrey'
+                    }`}>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="radio"
+                        name="eventType"
+                        checked={!isRecurring}
+                        onChange={() => setIsRecurring(false)}
+                        className="w-4 h-4 text-barTrekker-orange"
+                      />
+                      <div>
+                        <div className="font-medium text-barTrekker-darkGrey">One-time Event</div>
+                        <div className="text-sm text-gray-500">Single occurrence</div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex-1 cursor-pointer">
+                  <div className={`p-4 border rounded-lg transition-colors ${isRecurring
+                    ? 'border-barTrekker-lightBlue bg-blue-50'
+                    : 'border-barTrekker-lightGrey bg-white hover:border-barTrekker-darkGrey'
+                    }`}>
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="radio"
+                        name="eventType"
+                        checked={isRecurring}
+                        onChange={() => setIsRecurring(true)}
+                        className="w-4 h-4 text-barTrekker-lightBlue"
+                      />
+                      <div>
+                        <div className="font-medium text-barTrekker-darkGrey">Recurring Event</div>
+                        <div className="text-sm text-gray-500">Daily schedule</div>
+                      </div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </FormField>
+          </div>
+
+          {/* Recurring Event Settings - Only show when recurring is selected */}
+          {isRecurring && (
+            <div className="mt-6 space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900">Recurring Event Settings</h3>
+
+              {/* Recurring Time */}
+              <FormField label="Event Time" required>
+                <Input
+                  type="time"
+                  value={recurringTime}
+                  onChange={(e) => setRecurringTime(e.target.value)}
+                  className="bg-gray-50 border-gray-300 focus:border-barTrekker-orange focus:ring-barTrekker-orange"
+                />
+              </FormField>
+
+              {/* Schedule Type */}
+              <div className="space-y-4">
+                <label className="text-sm font-medium text-gray-900">Schedule Type *</label>
+
+                <div className="flex space-x-4">
+                  {/* Daily Option */}
+                  <label className="flex-1 cursor-pointer">
+                    <div className={`p-4 border rounded-lg transition-colors ${scheduleType === 'daily'
+                      ? 'border-barTrekker-orange bg-orange-50'
+                      : 'border-barTrekker-lightGrey bg-white hover:border-barTrekker-darkGrey'
+                      }`}>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="radio"
+                          name="scheduleType"
+                          checked={scheduleType === 'daily'}
+                          onChange={() => setScheduleType('daily')}
+                          className="w-4 h-4 text-barTrekker-orange"
+                        />
+                        <div>
+                          <div className="font-medium text-barTrekker-darkGrey">Daily (Every Day)</div>
+                          <div className="text-sm text-gray-500">Runs every day</div>
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Custom Option */}
+                  <label className="flex-1 cursor-pointer">
+                    <div className={`p-4 border rounded-lg transition-colors ${scheduleType === 'custom'
+                      ? 'border-barTrekker-lightBlue bg-blue-50'
+                      : 'border-barTrekker-lightGrey bg-white hover:border-barTrekker-darkGrey'
+                      }`}>
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="radio"
+                          name="scheduleType"
+                          checked={scheduleType === 'custom'}
+                          onChange={() => setScheduleType('custom')}
+                          className="w-4 h-4 text-barTrekker-lightBlue"
+                        />
+                        <div>
+                          <div className="font-medium text-barTrekker-darkGrey">Custom Schedule</div>
+                          <div className="text-sm text-gray-500">Choose specific days</div>
+                        </div>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Custom Days Selection - Only show if custom is selected */}
+                {scheduleType === 'custom' && (
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-barTrekker-darkGrey">Select Days *</label>
+                    <div className="flex items-center space-x-2">
+                      {[0, 1, 2, 3, 4, 5, 6].map((day) => (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            const newDays = selectedDays.includes(day)
+                              ? selectedDays.filter(d => d !== day)
+                              : [...selectedDays, day];
+                            setSelectedDays(newDays);
+                          }}
+                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${selectedDays.includes(day)
+                            ? 'bg-barTrekker-orange text-white'
+                            : 'bg-barTrekker-lightGrey text-barTrekker-darkGrey hover:bg-gray-300'
+                            }`}
+                        >
+                          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedDays.length === 0 && (
+                      <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <p className="text-sm text-red-600 font-medium">Please select at least one day for your event</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </FormSection>
 
         {/* Media Section */}

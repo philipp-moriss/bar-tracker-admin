@@ -8,8 +8,7 @@ import {
   deleteDoc,
   query,
   where,
-  Timestamp,
-  getDocsFromServer
+  Timestamp
 } from 'firebase/firestore'
 import { db } from '@/modules/firebase/config'
 import { Event, CreateEventData, UpdateEventData, EventFilters, EventStats, EventStatus } from '@/core/types/event'
@@ -39,8 +38,7 @@ async function getEvents(filters?: EventFilters): Promise<Event[]> {
       q = query(q, where('startTime', '<=', Timestamp.fromDate(filters.dateTo)))
     }
 
-    // Use getDocsFromServer to bypass cache and get fresh data
-    const snapshot = await getDocsFromServer(q)
+    const snapshot = await getDocs(q)
     let events = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
@@ -145,8 +143,8 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
 
     const eventToCreate = {
       ...sanitized,
-      startTime: Timestamp.fromDate(eventData.startTime),
-      status: EventStatus.ACTIVE,
+      startTime: eventData.startTime ? Timestamp.fromDate(eventData.startTime) : undefined,
+      status: eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE,
       rating: 0,
       createdAt: Timestamp.fromDate(now),
       updatedAt: Timestamp.fromDate(now),
@@ -159,7 +157,7 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
     return {
       id: docRef.id,
       ...eventData,
-      status: EventStatus.ACTIVE,
+      status: eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE,
       rating: 0,
       createdAt: now,
       updatedAt: now,
@@ -264,6 +262,7 @@ async function getEventStats(): Promise<EventStats> {
       activeEvents: events.filter(e => e.status === EventStatus.ACTIVE).length,
       completedEvents: events.filter(e => e.status === EventStatus.COMPLETED).length,
       cancelledEvents: events.filter(e => e.status === EventStatus.CANCELLED).length,
+      permanentEvents: events.filter(e => e.status === EventStatus.PERMANENT).length,
       totalRevenue: events.reduce((sum, event) => sum + parseFloat(event.price || '0'), 0),
       averageRating: events.length > 0
         ? events.reduce((sum, event) => sum + (event.rating || 0), 0) / events.length
@@ -310,7 +309,7 @@ async function autoCompleteExpiredEvents(): Promise<number> {
         const duration = event.route?.totalDuration ? `${event.route.totalDuration} min` : `${defaultDuration} hours (smart default)`
         console.log(`Event "${event.name}": startTime=${eventStartTime.toLocaleString()}, duration=${duration}, endTime=${eventEndTime.toLocaleString()}, now=${now.toLocaleString()}, expired=${eventEndTime < now}`)
 
-        if (eventEndTime < now) {
+        if (eventEndTime < now && event.status === EventStatus.ACTIVE) {
           console.log(`Completing expired event: ${event.name}`)
           await updateEventStatus(event.id, EventStatus.COMPLETED)
           count++
@@ -325,6 +324,7 @@ async function autoCompleteExpiredEvents(): Promise<number> {
     throw new Error('Failed to auto-complete expired events')
   }
 }
+
 
 export const eventService = {
   getEvents,

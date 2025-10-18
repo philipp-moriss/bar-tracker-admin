@@ -43,7 +43,7 @@ export interface Event {
     latitude: number
     longitude: number
   }
-  startTime: Timestamp | Date
+  startTime?: Timestamp | Date // Optional for recurring events
   country: string
   timezone?: string // e.g., 'Europe/Warsaw', 'Europe/London'
   includedDescription: string
@@ -58,6 +58,10 @@ export interface Event {
   barWebsite?: string
   // Bartender assignment
   assignedBartenders?: string[] // Array of bartender user IDs assigned to this event
+  // Recurring event fields
+  isRecurring?: boolean // Whether this is a recurring event
+  recurringTime?: string // Time for recurring events (e.g., "19:00")
+  recurringDays?: number[] // Days of week for recurring events (0=Sunday, 1=Monday, etc.)
   status?: EventStatus
   createdAt?: Timestamp | Date
   updatedAt?: Timestamp | Date
@@ -73,7 +77,7 @@ export interface CreateEventData {
   currency: string
   description: string
   imageURL: string
-  startTime: Date
+  startTime?: Date // Optional for recurring events
   country: string
   timezone?: string // e.g., 'Europe/Warsaw', 'Europe/London'
   includedDescription: string
@@ -92,6 +96,10 @@ export interface CreateEventData {
   barWebsite?: string
   // Bartender assignment
   assignedBartenders?: string[] // Array of bartender user IDs assigned to this event
+  // Recurring event fields
+  isRecurring?: boolean // Whether this is a recurring event
+  recurringTime?: string // Time for recurring events (e.g., "19:00")
+  recurringDays?: number[] // Days of week for recurring events (0=Sunday, 1=Monday, etc.)
   // Images
   images?: string[] // URLs of uploaded images
   route?: EventRoute
@@ -108,7 +116,8 @@ export enum EventStatus {
   ACTIVE = 'active',
   COMPLETED = 'completed',
   CANCELLED = 'cancelled',
-  DRAFT = 'draft'
+  DRAFT = 'draft',
+  PERMANENT = 'permanent'
 }
 
 // Event filters
@@ -128,6 +137,7 @@ export interface EventStats {
   activeEvents: number
   completedEvents: number
   cancelledEvents: number
+  permanentEvents: number
   totalRevenue: number
   averageRating: number
 }
