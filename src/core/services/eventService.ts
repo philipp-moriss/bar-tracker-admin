@@ -143,7 +143,7 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
 
     const eventToCreate = {
       ...sanitized,
-      startTime: eventData.startTime ? Timestamp.fromDate(eventData.startTime) : undefined,
+      ...(eventData.startTime ? { startTime: Timestamp.fromDate(eventData.startTime) } : {}),
       status: eventData.status || (eventData.isRecurring ? EventStatus.PERMANENT : EventStatus.ACTIVE),
       rating: 0,
       createdAt: Timestamp.fromDate(now),

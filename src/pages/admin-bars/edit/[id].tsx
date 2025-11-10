@@ -13,6 +13,7 @@ import { Bar } from '@/core/types/bar';
 import { toast } from 'sonner';
 import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
 import { ImageUploadResult } from '@/core/services/imageService';
+import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
 
 export const EditBarPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -132,6 +133,17 @@ export const EditBarPage = () => {
         setFormData(prev => ({
             ...prev,
             [field]: value
+        }));
+    };
+
+    const handleCoordinateUpdate = (latitude: number, longitude: number) => {
+        const round = (v: number) => Math.round(v * 1e6) / 1e6;
+        setFormData(prev => ({
+            ...prev,
+            coordinates: {
+                latitude: round(latitude),
+                longitude: round(longitude)
+            }
         }));
     };
 
@@ -258,36 +270,43 @@ export const EditBarPage = () => {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-4">
                                     <div>
-                                        <Label htmlFor="latitude">Latitude</Label>
-                                        <Input
-                                            id="latitude"
-                                            type="number"
-                                            step="any"
-                                            value={formData.coordinates?.latitude || 0}
-                                            onChange={(e) => handleInputChange('coordinates', {
-                                                ...formData.coordinates,
-                                                latitude: parseFloat(e.target.value) || 0
-                                            })}
-                                            placeholder="Enter latitude"
-                                            className="mt-1"
+                                        <h4 className="text-sm font-semibold text-barTrekker-darkGrey mb-2">Google Maps link</h4>
+                                        <GoogleMapsImporter
+                                            onCoordinatesFound={(latitude, longitude) => {
+                                                handleCoordinateUpdate(latitude, longitude);
+                                            }}
                                         />
+                                        <p className="text-xs text-gray-500 mt-2">
+                                            Open the bar address in Google Maps, copy the link, and paste it above. Coordinates will populate automatically.
+                                        </p>
                                     </div>
-                                    <div>
-                                        <Label htmlFor="longitude">Longitude</Label>
-                                        <Input
-                                            id="longitude"
-                                            type="number"
-                                            step="any"
-                                            value={formData.coordinates?.longitude || 0}
-                                            onChange={(e) => handleInputChange('coordinates', {
-                                                ...formData.coordinates,
-                                                longitude: parseFloat(e.target.value) || 0
-                                            })}
-                                            placeholder="Enter longitude"
-                                            className="mt-1"
-                                        />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <Label htmlFor="latitude">Latitude</Label>
+                                            <Input
+                                                id="latitude"
+                                                type="number"
+                                                step="any"
+                                                value={formData.coordinates?.latitude ?? 0}
+                                                onChange={(e) => handleCoordinateUpdate(parseFloat(e.target.value) || 0, formData.coordinates?.longitude ?? 0)}
+                                                placeholder="Enter latitude"
+                                                className="mt-1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="longitude">Longitude</Label>
+                                            <Input
+                                                id="longitude"
+                                                type="number"
+                                                step="any"
+                                                value={formData.coordinates?.longitude ?? 0}
+                                                onChange={(e) => handleCoordinateUpdate(formData.coordinates?.latitude ?? 0, parseFloat(e.target.value) || 0)}
+                                                placeholder="Enter longitude"
+                                                className="mt-1"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

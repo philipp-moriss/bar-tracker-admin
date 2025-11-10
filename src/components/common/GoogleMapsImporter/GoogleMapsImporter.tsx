@@ -111,19 +111,17 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
     }
 
     const exampleUrls = [
-        'https://maps.google.com/maps?q=40.7128,-74.0060',
-        'https://www.google.com/maps/@40.7128,-74.0060,15z',
-        'https://maps.google.com/maps?ll=40.7128,-74.0060&z=15'
+        'https://maps.google.com/maps?q=40.7128,-74.0060'
     ]
 
     return (
         <div className={cn('space-y-4', className)}>
             <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
-                    Import from Google Maps
+                    Paste Google Maps link
                 </label>
                 <p className="text-xs text-gray-500">
-                    Paste a Google Maps URL to automatically extract coordinates
+                    Paste a Google Maps link to fill coordinates automatically.
                 </p>
             </div>
 
@@ -177,30 +175,15 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
                 )}
 
                 {/* Example URLs */}
-                <div className="space-y-2">
-                    <p className="text-xs text-gray-500 font-medium">Example URLs:</p>
-                    <div className="space-y-1">
-                        {exampleUrls.map((exampleUrl, index) => (
-                            <button
-                                key={index}
-                                onClick={() => setUrl(exampleUrl)}
-                                className="block text-xs text-blue-600 hover:text-blue-800 hover:underline text-left"
-                            >
-                                {exampleUrl}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Help Text */}
-                <div className="text-xs text-gray-500">
-                    <p>Supported formats:</p>
-                    <ul className="list-disc list-inside space-y-1 mt-1">
-                        <li>@latitude,longitude,zoom</li>
-                        <li>!3dlatitude!4dlongitude</li>
-                        <li>ll=latitude,longitude</li>
-                        <li>q=latitude,longitude</li>
-                    </ul>
+                <div className="space-y-1 text-xs text-gray-500">
+                    <p className="font-medium">Example:</p>
+                    <button
+                        onClick={() => setUrl(exampleUrls[0])}
+                        className="text-blue-600 hover:text-blue-800 hover:underline text-left"
+                    >
+                        https://maps.google.com/maps?q=40.7128,-74.0060
+                    </button>
+                    <p>Plain Google Maps links (maps.google.com) work.</p>
                 </div>
             </div>
         </div>
