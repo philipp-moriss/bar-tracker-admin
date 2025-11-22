@@ -28,6 +28,12 @@ export interface EventNotificationSettings {
   locationReminders: number
   arrivalNotifications: boolean
   departureNotifications: boolean
+  // Custom notification messages
+  customReminderTitle?: string
+  customReminderBody?: string
+  customLeavingTitle?: string
+  customLeavingBody?: string
+  customMapConfirmMessage?: string
 }
 
 // Event types based on mobile app structure

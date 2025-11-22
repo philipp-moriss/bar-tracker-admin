@@ -478,6 +478,88 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                                     <span className="text-sm text-gray-700">Send departure notifications</span>
                                 </label>
                             </div>
+
+                            {/* Custom Notification Messages */}
+                            <div className="mt-6 pt-6 border-t border-gray-200">
+                                <h4 className="text-sm font-semibold text-gray-900 mb-4">Custom Notification Messages</h4>
+                                
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Reminder Notification Title
+                                        </label>
+                                        <Input
+                                            value={notificationSettings?.customReminderTitle || ''}
+                                            onChange={(e) => updateNotificationSettings({
+                                                customReminderTitle: e.target.value
+                                            })}
+                                            placeholder="Event Starting Soon!"
+                                            className="bg-white"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Leave empty to use default</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Reminder Notification Message
+                                        </label>
+                                        <Input
+                                            value={notificationSettings?.customReminderBody || ''}
+                                            onChange={(e) => updateNotificationSettings({
+                                                customReminderBody: e.target.value
+                                            })}
+                                            placeholder="Event starts in {minutes} minutes"
+                                            className="bg-white"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Use {"{minutes}"} as placeholder for minutes</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Leaving Notification Title
+                                        </label>
+                                        <Input
+                                            value={notificationSettings?.customLeavingTitle || ''}
+                                            onChange={(e) => updateNotificationSettings({
+                                                customLeavingTitle: e.target.value
+                                            })}
+                                            placeholder="Moving to Next Location"
+                                            className="bg-white"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Leave empty to use default</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Leaving Notification Message
+                                        </label>
+                                        <Input
+                                            value={notificationSettings?.customLeavingBody || ''}
+                                            onChange={(e) => updateNotificationSettings({
+                                                customLeavingBody: e.target.value
+                                            })}
+                                            placeholder="Leaving for {nextLocation} in {minutes} minutes"
+                                            className="bg-white"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Use {"{nextLocation}"} and {"{minutes}"} as placeholders</p>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Map Confirmation Message
+                                        </label>
+                                        <Input
+                                            value={notificationSettings?.customMapConfirmMessage || ''}
+                                            onChange={(e) => updateNotificationSettings({
+                                                customMapConfirmMessage: e.target.value
+                                            })}
+                                            placeholder="This will open the location in your default maps application"
+                                            className="bg-white"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Message shown when user clicks "Open Map"</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </CardContent>
