@@ -36,6 +36,16 @@ export interface EventNotificationSettings {
   customMapConfirmMessage?: string
 }
 
+// Recurring notification that fires daily at specific time
+export interface EventRecurringNotification {
+  id: string
+  time: string // HH:mm in UTC
+  title: string
+  body: string
+  mapUrl?: string
+  isActive: boolean
+}
+
 // Event types based on mobile app structure
 export interface Event {
   id?: string
@@ -75,6 +85,7 @@ export interface Event {
   images?: string[] // URLs of uploaded images
   route?: EventRoute
   notificationSettings?: EventNotificationSettings
+  recurringNotifications?: EventRecurringNotification[]
 }
 
 export interface CreateEventData {
@@ -112,6 +123,7 @@ export interface CreateEventData {
   images?: string[] // URLs of uploaded images
   route?: EventRoute
   notificationSettings?: EventNotificationSettings
+  recurringNotifications?: EventRecurringNotification[]
 }
 
 export interface UpdateEventData extends Partial<CreateEventData> {

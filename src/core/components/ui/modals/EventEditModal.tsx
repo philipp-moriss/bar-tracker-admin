@@ -5,7 +5,7 @@ import { FormSection, FormField, FormGrid } from './FormSection';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Textarea } from '@/core/components/ui/inputs/textarea';
 import { FormSelect } from '@/core/components/ui/inputs/FormSelect';
-import { Event, EventStatus, UpdateEventData, EventRoute, EventNotificationSettings } from '@/core/types/event';
+import { Event, EventStatus, UpdateEventData, EventRoute, EventNotificationSettings, EventRecurringNotification } from '@/core/types/event';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
 import { Bar } from '@/core/types/bar';
@@ -44,7 +44,7 @@ const getTimezoneByCountry = (country: string): string => {
     'Sweden': 'Europe/Stockholm',
     'Norway': 'Europe/Oslo',
     'Denmark': 'Europe/Copenhagen',
-    'Switzerland': 'Europe/Zurich'
+    'Switzerland': 'Europe/Zurich',
   };
 
   return timezoneMap[country] || 'Europe/London';
@@ -94,6 +94,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
   const [bars, setBars] = useState<Bar[]>([]);
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
+  const [recurringNotifications, setRecurringNotifications] = useState<EventRecurringNotification[]>([]);
   const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
   const [confirmData, setConfirmData] = useState<{
     message: string;
@@ -156,6 +157,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
 
       setEventRoute(event.route);
       setNotificationSettings(event.notificationSettings);
+      setRecurringNotifications(event.recurringNotifications || []);
       setSelectedBartenderIds(event.assignedBartenders || []);
     }
   }, [event]);
@@ -255,6 +257,7 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
         ...formData,
         route: eventRoute,
         notificationSettings: notificationSettings,
+        recurringNotifications: recurringNotifications.length > 0 ? recurringNotifications : undefined,
         assignedBartenders: selectedBartenderIds.length > 0 ? selectedBartenderIds : [],
         // Recurring event fields
         isRecurring: isRecurring,
@@ -778,10 +781,13 @@ export const EventEditModal: React.FC<EventEditModalProps> = ({
             <EventRouteManager
               route={eventRoute}
               notificationSettings={notificationSettings}
+              recurringNotifications={recurringNotifications}
               onRouteChange={setEventRoute}
               onNotificationSettingsChange={setNotificationSettings}
+              onRecurringNotificationsChange={setRecurringNotifications}
               bars={bars}
               startBar={startBar}
+              timezone={event?.timezone || getTimezoneByCountry(formData.country || 'Poland')}
             />
           </FormSection>
         )}

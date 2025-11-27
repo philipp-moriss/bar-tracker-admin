@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { db } from '@/modules/firebase/config';
-import { collection, getDocs, query, orderBy, doc, writeBatch, addDoc, Timestamp } from 'firebase/firestore';
-import { Bell, Send, Clock, Calendar, MapPin, X, Trash2, CheckCircle2 } from 'lucide-react';
+import { collection, getDocs, query, orderBy, doc, writeBatch, addDoc, Timestamp, updateDoc } from 'firebase/firestore';
+import { Bell, Send, Clock, Calendar, MapPin, Trash2, CheckCircle2, Repeat, Edit2, Power, PowerOff } from 'lucide-react';
 import { Label } from '@/core/components/ui/label';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Button } from '@/core/components/ui/button';
@@ -11,11 +11,9 @@ import { toastManager } from '@/core/components/ui/toast/toast';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { Modal } from '@/core/components/ui/modals';
 import { eventService } from '@/core/services/eventService';
-import { Event } from '@/core/types/event';
+import { Event, EventRecurringNotification } from '@/core/types/event';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/core/components/ui/inputs/select';
 import { Badge } from '@/core/components/ui/badge';
-
-
 type FormState = {
   title: string;
   body: string;
@@ -24,6 +22,43 @@ type FormState = {
   scheduleType: 'immediate' | 'scheduled';
   scheduledDate: string;
   scheduledTime: string;
+};
+
+type RecurringFromEvent = {
+  eventId: string;
+  eventName: string;
+  notification: EventRecurringNotification;
+  timezone: string;
+};
+
+// Helper function to convert UTC time to local timezone
+const utcToLocal = (utcTime: string, timezone: string): string => {
+  try {
+    const [hours, minutes] = utcTime.split(':').map(Number);
+    const date = new Date();
+    date.setUTCHours(hours, minutes, 0, 0);
+    return date.toLocaleTimeString('en-GB', { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      timeZone: timezone,
+      hour12: false
+    });
+  } catch {
+    return utcTime;
+  }
+};
+
+const getTimezoneByCountry = (country: string): string => {
+  const timezoneMap: { [key: string]: string } = {
+    'Poland': 'Europe/Warsaw',
+    'United Kingdom': 'Europe/London',
+    'UK': 'Europe/London',
+    'Germany': 'Europe/Berlin',
+    'France': 'Europe/Paris',
+    'Spain': 'Europe/Madrid',
+    'Italy': 'Europe/Rome',
+  };
+  return timezoneMap[country] || 'Europe/London';
 };
 
 type NotificationHistory = {
@@ -39,6 +74,7 @@ type NotificationHistory = {
   scheduled?: boolean;
   scheduleId?: string;
   scheduledFor?: Date;
+  recurring?: boolean;
 };
 
 export default function NotificationsPage() {
@@ -53,9 +89,15 @@ export default function NotificationsPage() {
   });
   const [events, setEvents] = useState<Event[]>([]);
   const [history, setHistory] = useState<NotificationHistory[]>([]);
+  const [recurringFromEvents, setRecurringFromEvents] = useState<RecurringFromEvent[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  
+  // Edit recurring modal state
+  const [editRecurringOpen, setEditRecurringOpen] = useState(false);
+  const [selectedRecurring, setSelectedRecurring] = useState<RecurringFromEvent | null>(null);
+  const [editForm, setEditForm] = useState({ time: '', title: '', body: '', mapUrl: '' });
   const isEventValid = useMemo(() => form.title.trim().length > 0 && form.body.trim().length > 0 && form.eventId.length > 0, [form]);
   const isScheduledValid = useMemo(() => {
     if (form.scheduleType === 'scheduled') {
@@ -63,9 +105,6 @@ export default function NotificationsPage() {
     }
     return true;
   }, [form.scheduleType, form.scheduledDate, form.scheduledTime]);
-
-
-
 
 
   async function sendEventNotification() {
@@ -112,7 +151,7 @@ export default function NotificationsPage() {
         };
 
         // Save to history first to get history doc ID
-        const historyData: any = {
+        const historyData: Record<string, unknown> = {
           eventId: form.eventId,
           title: form.title,
           body: form.body,
@@ -172,7 +211,7 @@ export default function NotificationsPage() {
       const result = await response.json();
       
       // Save notification to history directly in Firestore
-      const historyData: any = {
+      const historyData: Record<string, unknown> = {
         eventId: form.eventId,
         title: form.title,
         body: form.body,
@@ -210,6 +249,23 @@ export default function NotificationsPage() {
     try {
       const eventsList = await eventService.getEvents();
       setEvents(eventsList);
+      
+      // Extract recurring notifications from events
+      const recurring: RecurringFromEvent[] = [];
+      eventsList.forEach(event => {
+        if (event.recurringNotifications && event.recurringNotifications.length > 0) {
+          const eventTimezone = event.timezone || getTimezoneByCountry(event.country);
+          event.recurringNotifications.forEach(notification => {
+            recurring.push({
+              eventId: event.id || '',
+              eventName: event.name,
+              notification,
+              timezone: eventTimezone
+            });
+          });
+        }
+      });
+      setRecurringFromEvents(recurring);
     } catch (error) {
       console.error('Error loading events:', error);
       toastManager.error('Failed to load events');
@@ -219,10 +275,10 @@ export default function NotificationsPage() {
   async function loadHistory() {
     try {
       const snap = await getDocs(query(collection(db, 'notificationHistory'), orderBy('createdAt', 'desc')));
-      const historyData = snap.docs.map(doc => {
-        const data = doc.data();
+      const historyData = snap.docs.map(docSnap => {
+        const data = docSnap.data();
         return {
-          id: doc.id,
+          id: docSnap.id,
           ...data,
           sentAt: data.sentAt?.toDate() || new Date(),
           createdAt: data.createdAt?.toDate() || new Date(),
@@ -233,6 +289,98 @@ export default function NotificationsPage() {
     } catch (error) {
       console.error('Error loading notification history:', error);
       setHistory([]);
+    }
+  }
+
+  function openEditRecurring(item: RecurringFromEvent) {
+    setSelectedRecurring(item);
+    setEditForm({
+      time: item.notification.time,
+      title: item.notification.title,
+      body: item.notification.body,
+      mapUrl: item.notification.mapUrl || ''
+    });
+    setEditRecurringOpen(true);
+  }
+
+  async function saveRecurringEdit() {
+    if (!selectedRecurring) return;
+    
+    try {
+      const event = events.find(e => e.id === selectedRecurring.eventId);
+      if (!event || !event.recurringNotifications) {
+        toastManager.error('Event not found');
+        return;
+      }
+
+      const updatedNotifications = event.recurringNotifications.map(n => {
+        if (n.id === selectedRecurring.notification.id) {
+          const updated: typeof n = {
+            ...n,
+            time: editForm.time,
+            title: editForm.title,
+            body: editForm.body,
+          };
+          if (editForm.mapUrl) {
+            updated.mapUrl = editForm.mapUrl;
+          } else {
+            delete updated.mapUrl;
+          }
+          return updated;
+        }
+        return n;
+      });
+
+      await updateDoc(doc(db, 'events', selectedRecurring.eventId), {
+        recurringNotifications: updatedNotifications
+      });
+
+      toastManager.success('Recurring notification updated');
+      setEditRecurringOpen(false);
+      await loadEvents();
+    } catch (error) {
+      console.error('Error updating recurring notification:', error);
+      toastManager.error('Failed to update');
+    }
+  }
+
+  async function toggleRecurringActive(item: RecurringFromEvent) {
+    try {
+      const event = events.find(e => e.id === item.eventId);
+      if (!event || !event.recurringNotifications) return;
+
+      const updatedNotifications = event.recurringNotifications.map(n => 
+        n.id === item.notification.id ? { ...n, isActive: !n.isActive } : n
+      );
+
+      await updateDoc(doc(db, 'events', item.eventId), {
+        recurringNotifications: updatedNotifications
+      });
+
+      toastManager.success(`Recurring notification ${!item.notification.isActive ? 'activated' : 'paused'}`);
+      await loadEvents();
+    } catch (error) {
+      console.error('Error toggling recurring notification:', error);
+      toastManager.error('Failed to toggle');
+    }
+  }
+
+  async function deleteRecurring(item: RecurringFromEvent) {
+    try {
+      const event = events.find(e => e.id === item.eventId);
+      if (!event || !event.recurringNotifications) return;
+
+      const updatedNotifications = event.recurringNotifications.filter(n => n.id !== item.notification.id);
+
+      await updateDoc(doc(db, 'events', item.eventId), {
+        recurringNotifications: updatedNotifications.length > 0 ? updatedNotifications : []
+      });
+
+      toastManager.success('Recurring notification deleted');
+      await loadEvents();
+    } catch (error) {
+      console.error('Error deleting recurring notification:', error);
+      toastManager.error('Failed to delete');
     }
   }
 
@@ -451,10 +599,10 @@ export default function NotificationsPage() {
                     <SelectContent>
                       {events.map(event => (
                         <SelectItem key={event.id} value={event.id || ''}>
-                          {event.name} - {event.startTime instanceof Date 
-                            ? event.startTime.toLocaleDateString() 
-                            : event.startTime?.toDate ? event.startTime.toDate().toLocaleDateString()
-                            : new Date(event.startTime as any).toLocaleDateString()}
+                          {event.name} {event.isRecurring ? '(Recurring)' : event.startTime instanceof Date 
+                            ? `- ${event.startTime.toLocaleDateString()}`
+                            : event.startTime?.toDate ? `- ${event.startTime.toDate().toLocaleDateString()}`
+                            : ''}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -514,6 +662,172 @@ export default function NotificationsPage() {
           </div>
         </Modal>
 
+        {/* Recurring Notifications */}
+        {recurringFromEvents.length > 0 && (
+          <Card className="shadow-sm border-0 bg-gradient-to-r from-green-50 to-white mb-6">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold text-gray-800 flex items-center">
+                <Repeat className="h-5 w-5 mr-2 text-green-600" />
+                Recurring Notifications
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-green-50">
+                    <TableHead className="font-semibold text-gray-700">Event</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Title</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Message</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Time (UTC)</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                    <TableHead className="font-semibold text-gray-700">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recurringFromEvents.map((item, index) => (
+                    <TableRow key={`${item.eventId}-${item.notification.id}-${index}`} className="hover:bg-green-50/50">
+                      <TableCell>
+                        <span className="font-medium text-gray-900">{item.eventName}</span>
+                      </TableCell>
+                      <TableCell className="text-gray-900">{item.notification.title}</TableCell>
+                      <TableCell className="max-w-[200px] truncate text-gray-600">{item.notification.body}</TableCell>
+                      <TableCell className="font-mono text-gray-700">
+                        <div>{utcToLocal(item.notification.time, item.timezone)}</div>
+                        <div className="text-xs text-gray-400">({item.notification.time} UTC)</div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={item.notification.isActive ? "default" : "secondary"}
+                          className={item.notification.isActive ? "bg-green-500" : ""}
+                        >
+                          {item.notification.isActive ? 'Active' : 'Paused'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditRecurring(item)}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleRecurringActive(item)}
+                            className={item.notification.isActive ? "text-amber-600 hover:text-amber-700" : "text-green-600 hover:text-green-700"}
+                          >
+                            {item.notification.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => deleteRecurring(item)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Edit Recurring Modal */}
+        <Modal 
+          open={editRecurringOpen} 
+          onOpenChange={setEditRecurringOpen}
+          title="Edit Recurring Notification"
+          className="max-w-lg"
+        >
+          <div className="space-y-5 p-4">
+            {/* Event Name */}
+            <div className="bg-gray-50 rounded-lg p-3">
+              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Event</Label>
+              <p className="text-gray-900 font-semibold mt-1">{selectedRecurring?.eventName}</p>
+            </div>
+
+            {/* Time */}
+            <div>
+              <Label htmlFor="edit-time" className="text-sm font-medium text-gray-700 mb-2 block">
+                Time (UTC)
+              </Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="edit-time"
+                  type="time"
+                  value={editForm.time}
+                  onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
+                  className="bg-white w-32"
+                />
+                <span className="text-sm text-gray-500">Daily at this time</span>
+              </div>
+            </div>
+
+            {/* Title */}
+            <div>
+              <Label htmlFor="edit-title" className="text-sm font-medium text-gray-700 mb-2 block">
+                Title
+              </Label>
+              <Input
+                id="edit-title"
+                value={editForm.title}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                placeholder="e.g., Time to move!"
+                className="bg-white"
+              />
+            </div>
+
+            {/* Message */}
+            <div>
+              <Label htmlFor="edit-body" className="text-sm font-medium text-gray-700 mb-2 block">
+                Message
+              </Label>
+              <Input
+                id="edit-body"
+                value={editForm.body}
+                onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
+                placeholder="e.g., Drink up! We're moving in 15 minutes"
+                className="bg-white"
+              />
+            </div>
+
+            {/* Map URL */}
+            <div>
+              <Label htmlFor="edit-mapUrl" className="text-sm font-medium text-gray-700 mb-2 block">
+                Map URL <span className="text-gray-400 font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="edit-mapUrl"
+                value={editForm.mapUrl}
+                onChange={(e) => setEditForm({ ...editForm, mapUrl: e.target.value })}
+                placeholder="https://maps.apple.com/..."
+                className="bg-white"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex justify-end space-x-3 pt-2 border-t border-gray-100">
+              <Button variant="outline" onClick={() => setEditRecurringOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={saveRecurringEdit}
+                disabled={!editForm.title.trim() || !editForm.body.trim()}
+                className="bg-barTrekker-orange hover:bg-barTrekker-orange/90"
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
         <Card className="shadow-sm border-0 bg-gradient-to-r from-gray-50 to-white">
           <CardHeader className="pb-4">
             <div className="flex justify-between items-center">
@@ -548,6 +862,7 @@ export default function NotificationsPage() {
                       <TableHead className="font-semibold text-gray-700">Title</TableHead>
                       <TableHead className="font-semibold text-gray-700">Message</TableHead>
                       <TableHead className="font-semibold text-gray-700">Event</TableHead>
+                      <TableHead className="font-semibold text-gray-700">Type</TableHead>
                       <TableHead className="font-semibold text-gray-700">Status</TableHead>
                       <TableHead className="font-semibold text-gray-700">Sent At</TableHead>
                     </TableRow>
@@ -560,16 +875,34 @@ export default function NotificationsPage() {
                       return (
                         <TableRow key={item.id} className="hover:bg-gray-50">
                           <TableCell className="font-medium text-gray-900">{item.title}</TableCell>
-                          <TableCell className="max-w-[300px] truncate text-gray-600">{item.body}</TableCell>
+                          <TableCell className="max-w-[250px] truncate text-gray-600">{item.body}</TableCell>
                           <TableCell>
                             <span className="text-gray-700">{event?.name || 'Unknown Event'}</span>
+                          </TableCell>
+                          <TableCell>
+                            {item.recurring ? (
+                              <Badge variant="outline" className="text-green-600 border-green-300">
+                                <Repeat className="h-3 w-3 mr-1" />
+                                Recurring
+                              </Badge>
+                            ) : isScheduled ? (
+                              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                <Clock className="h-3 w-3 mr-1" />
+                                Scheduled
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-blue-600 border-blue-300">
+                                <Send className="h-3 w-3 mr-1" />
+                                Manual
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center space-x-2">
                               {isScheduled ? (
                                 <Badge variant="secondary" className="flex items-center space-x-1">
                                   <Clock className="h-3 w-3" />
-                                  <span>Scheduled</span>
+                                  <span>Pending</span>
                                 </Badge>
                               ) : (
                                 <Badge 
@@ -635,4 +968,3 @@ export default function NotificationsPage() {
     </AdminLayout>
   );
 }
-

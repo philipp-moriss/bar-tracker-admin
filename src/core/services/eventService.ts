@@ -189,10 +189,23 @@ async function updateEvent(eventData: UpdateEventData): Promise<void> {
 
     const docRef = doc(eventsCollection, id)
 
+    // Deep clean undefined values from objects and arrays
+    const cleanUndefined = (obj: any): any => {
+      if (Array.isArray(obj)) {
+        return obj.map(item => cleanUndefined(item)).filter(item => item !== undefined);
+      }
+      if (obj !== null && typeof obj === 'object') {
+        return Object.fromEntries(
+          Object.entries(obj)
+            .filter(([_, value]) => value !== undefined)
+            .map(([key, value]) => [key, cleanUndefined(value)])
+        );
+      }
+      return obj;
+    };
+
     // Filter out undefined values (but keep empty arrays and null)
-    const filteredData = Object.fromEntries(
-      Object.entries(updateData).filter(([_, value]) => value !== undefined)
-    )
+    const filteredData = cleanUndefined(updateData)
 
     const updatePayload: any = {
       ...filteredData,

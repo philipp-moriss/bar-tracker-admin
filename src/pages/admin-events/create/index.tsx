@@ -29,7 +29,7 @@ import { Textarea } from '@/core/components/ui/inputs/textarea';
 import { FormSelect } from '@/core/components/ui/inputs/FormSelect';
 import { eventService } from '@/core/services/eventService';
 import { barService } from '@/core/services/barService';
-import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation, EventStatus } from '@/core/types/event';
+import { CreateEventData, EventRoute, EventNotificationSettings, EventLocation, EventStatus, EventRecurringNotification } from '@/core/types/event';
 import { Bar } from '@/core/types/bar';
 import { AnalyticsService } from '@/core/services/analyticsService';
 import { EventRouteManager } from '@/components/common/EventRouteManager/EventRouteManager';
@@ -116,6 +116,7 @@ export const CreateEventPage = () => {
   const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
   const [eventRoute, setEventRoute] = useState<EventRoute | undefined>();
   const [notificationSettings, setNotificationSettings] = useState<EventNotificationSettings | undefined>();
+  const [recurringNotifications, setRecurringNotifications] = useState<EventRecurringNotification[]>([]);
   const [selectedCurrency, setSelectedCurrency] = useState<string>('gbp');
   const [selectedBartenderIds, setSelectedBartenderIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false); // Защита от двойной отправки
@@ -298,6 +299,7 @@ export const CreateEventPage = () => {
         images: uploadedImages.map(img => img.url),
         route: eventRoute,
         notificationSettings: notificationSettings,
+        recurringNotifications: recurringNotifications.length > 0 ? recurringNotifications : undefined,
         // Recurring event fields
         isRecurring: data.isRecurring || false,
         recurringTime: data.recurringTime,
@@ -1023,10 +1025,13 @@ export const CreateEventPage = () => {
                 <EventRouteManager
                   route={eventRoute}
                   notificationSettings={notificationSettings}
+                  recurringNotifications={recurringNotifications}
                   onRouteChange={setEventRoute}
                   onNotificationSettingsChange={setNotificationSettings}
+                  onRecurringNotificationsChange={setRecurringNotifications}
                   bars={bars}
                   startBar={selectedBar}
+                  timezone={getTimezoneByCountry(form.watch('country') || 'Poland')}
                 />
 
                 {/* Submit Button */}

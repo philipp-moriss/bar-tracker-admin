@@ -1,32 +1,87 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, MapPin, Clock, Settings, Navigation } from 'lucide-react';
+import { Plus, Trash2, MapPin, Clock, Settings, Navigation, Repeat, Power, PowerOff } from 'lucide-react';
 import { Button } from '@/core/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/core/components/ui/card';
 import { Input } from '@/core/components/ui/inputs/input';
 import { Textarea } from '@/core/components/ui/inputs/textarea';
 import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
-import { EventLocation, EventRoute, EventNotificationSettings } from '@/core/types/event';
+import { EventLocation, EventRoute, EventNotificationSettings, EventRecurringNotification } from '@/core/types/event';
 import { Bar } from '@/core/types/bar';
 
 interface EventRouteManagerProps {
     route?: EventRoute;
     notificationSettings?: EventNotificationSettings;
+    recurringNotifications?: EventRecurringNotification[];
     onRouteChange: (route: EventRoute | undefined) => void;
     onNotificationSettingsChange: (settings: EventNotificationSettings | undefined) => void;
+    onRecurringNotificationsChange?: (notifications: EventRecurringNotification[]) => void;
     bars?: Bar[];
     startBar?: Bar;
+    timezone?: string; // e.g., 'Europe/Warsaw'
 }
+
+// Helper functions for timezone conversion
+const utcToLocal = (utcTime: string, timezone: string): string => {
+    try {
+        const [hours, minutes] = utcTime.split(':').map(Number);
+        const date = new Date();
+        date.setUTCHours(hours, minutes, 0, 0);
+        return date.toLocaleTimeString('en-GB', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            timeZone: timezone,
+            hour12: false
+        });
+    } catch {
+        return utcTime;
+    }
+};
+
+const localToUtc = (localTime: string, timezone: string): string => {
+    try {
+        const [hours, minutes] = localTime.split(':').map(Number);
+        
+        // Get timezone offset by comparing UTC and local time for a reference point
+        const now = new Date();
+        const utcTime = now.toLocaleTimeString('en-GB', { timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false });
+        const localTzTime = now.toLocaleTimeString('en-GB', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: false });
+        
+        const [utcH, utcM] = utcTime.split(':').map(Number);
+        const [localH, localM] = localTzTime.split(':').map(Number);
+        
+        // Offset in minutes: local - utc
+        let offsetMinutes = (localH * 60 + localM) - (utcH * 60 + utcM);
+        if (offsetMinutes > 12 * 60) offsetMinutes -= 24 * 60;
+        if (offsetMinutes < -12 * 60) offsetMinutes += 24 * 60;
+        
+        // Convert input local time to UTC: UTC = local - offset
+        let utcTotalMinutes = (hours * 60 + minutes) - offsetMinutes;
+        if (utcTotalMinutes < 0) utcTotalMinutes += 24 * 60;
+        if (utcTotalMinutes >= 24 * 60) utcTotalMinutes -= 24 * 60;
+        
+        const utcHours = Math.floor(utcTotalMinutes / 60);
+        const utcMins = utcTotalMinutes % 60;
+        
+        return `${utcHours.toString().padStart(2, '0')}:${utcMins.toString().padStart(2, '0')}`;
+    } catch {
+        return localTime;
+    }
+};
 
 export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
     route,
     notificationSettings,
+    recurringNotifications = [],
     onRouteChange,
     onNotificationSettingsChange,
+    onRecurringNotificationsChange,
     bars = [],
     startBar,
+    timezone = 'Europe/London',
 }) => {
     const [showRouteBuilder, setShowRouteBuilder] = useState(false);
-    const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+    const [showRecurringNotifications, setShowRecurringNotifications] = useState(false);
+    const [newRecurring, setNewRecurring] = useState({ time: '20:00', title: '', body: '', mapUrl: '' });
 
     const createStartLocationFromBar = (bar: Bar): EventLocation => {
         return {
@@ -148,6 +203,37 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
         };
 
         onNotificationSettingsChange(updatedSettings);
+    };
+
+    const addRecurringNotification = () => {
+        if (!newRecurring.title.trim() || !newRecurring.body.trim() || !newRecurring.time) return;
+        
+        // Convert local time to UTC for storage
+        const utcTime = localToUtc(newRecurring.time, timezone);
+        
+        const newNotification: EventRecurringNotification = {
+            id: `recurring_${Date.now()}`,
+            time: utcTime, // Store in UTC
+            title: newRecurring.title.trim(),
+            body: newRecurring.body.trim(),
+            mapUrl: newRecurring.mapUrl.trim() || undefined,
+            isActive: true,
+        };
+
+        onRecurringNotificationsChange?.([...recurringNotifications, newNotification]);
+        setNewRecurring({ time: '20:00', title: '', body: '', mapUrl: '' });
+    };
+
+    const removeRecurringNotification = (id: string) => {
+        onRecurringNotificationsChange?.(recurringNotifications.filter(n => n.id !== id));
+    };
+
+    const toggleRecurringNotification = (id: string) => {
+        onRecurringNotificationsChange?.(
+            recurringNotifications.map(n => 
+                n.id === id ? { ...n, isActive: !n.isActive } : n
+            )
+        );
     };
 
     return (
@@ -395,170 +481,187 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                 </Card>
             )}
 
-            {/* Notification Settings */}
+            {/* Map Settings */}
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                         <Settings className="h-5 w-5" />
-                        <span>Notification Settings</span>
+                        <span>Map Settings</span>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Map Confirmation Message
+                        </label>
+                        <Input
+                            value={notificationSettings?.customMapConfirmMessage || ''}
+                            onChange={(e) => updateNotificationSettings({
+                                customMapConfirmMessage: e.target.value
+                            })}
+                            placeholder="This will open the location in your default maps application"
+                            className="bg-white"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Message shown when user clicks "Open Map" button</p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Recurring Notifications */}
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                        <Repeat className="h-5 w-5" />
+                        <span>Recurring Notifications</span>
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm text-gray-600 mb-2">
-                                Configure automatic notifications for event participants
+                                Daily notifications sent to participants at specific times
                             </p>
+                            {recurringNotifications.length > 0 && (
+                                <p className="text-xs text-green-600 font-medium">
+                                    {recurringNotifications.filter(n => n.isActive).length} active notification(s)
+                                </p>
+                            )}
                         </div>
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setShowNotificationSettings(!showNotificationSettings)}
+                            onClick={() => setShowRecurringNotifications(!showRecurringNotifications)}
                         >
-                            {showNotificationSettings ? 'Hide Settings' : 'Configure'}
+                            {showRecurringNotifications ? 'Hide' : 'Configure'}
                         </Button>
                     </div>
 
-                    {showNotificationSettings && (
+                    {showRecurringNotifications && (
                         <div className="mt-4 space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Start Reminder (minutes before)
-                                    </label>
-                                    <Input
-                                        type="number"
-                                        value={notificationSettings?.startReminder || 15}
-                                        onChange={(e) => updateNotificationSettings({
-                                            startReminder: parseInt(e.target.value) || 15
-                                        })}
-                                        placeholder="15"
-                                        className="bg-white"
-                                    />
+                            {/* Existing Recurring Notifications */}
+                            {recurringNotifications.length > 0 && (
+                                <div className="space-y-3">
+                                    {recurringNotifications.map((notification) => (
+                                        <div 
+                                            key={notification.id} 
+                                            className={`border rounded-lg p-4 ${notification.isActive ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="flex flex-col">
+                                                        <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-mono font-bold">
+                                                            {utcToLocal(notification.time, timezone)}
+                                                        </span>
+                                                        <span className="text-xs text-gray-500 mt-1 text-center">
+                                                            ({notification.time} UTC)
+                                                        </span>
+                                                    </div>
+                                                    <span className={`px-2 py-1 rounded text-xs ${notification.isActive ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-600'}`}>
+                                                        {notification.isActive ? 'Active' : 'Paused'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center space-x-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => toggleRecurringNotification(notification.id)}
+                                                        className={notification.isActive ? "text-amber-600 hover:text-amber-700" : "text-green-600 hover:text-green-700"}
+                                                    >
+                                                        {notification.isActive ? <PowerOff className="h-4 w-4" /> : <Power className="h-4 w-4" />}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => removeRecurringNotification(notification.id)}
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <div className="text-sm">
+                                                <p className="font-medium text-gray-900">{notification.title}</p>
+                                                <p className="text-gray-600">{notification.body}</p>
+                                                {notification.mapUrl && (
+                                                    <p className="text-xs text-blue-600 mt-1 truncate">📍 {notification.mapUrl}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
+                            )}
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Location Reminder (minutes before)
-                                    </label>
-                                    <Input
-                                        type="number"
-                                        value={notificationSettings?.locationReminders || 5}
-                                        onChange={(e) => updateNotificationSettings({
-                                            locationReminders: parseInt(e.target.value) || 5
-                                        })}
-                                        placeholder="5"
-                                        className="bg-white"
-                                    />
+                            {/* Add New Recurring Notification */}
+                            <div className="border-t border-gray-200 pt-4">
+                                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add Recurring Notification
+                                </h4>
+                                <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Time ({timezone.split('/').pop()})
+                                            </label>
+                                            <Input
+                                                type="time"
+                                                value={newRecurring.time}
+                                                onChange={(e) => setNewRecurring({ ...newRecurring, time: e.target.value })}
+                                                className="bg-white"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                = {localToUtc(newRecurring.time, timezone)} UTC
+                                            </p>
+                                        </div>
+                                        <div className="md:col-span-3">
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Title
+                                            </label>
+                                            <Input
+                                                value={newRecurring.title}
+                                                onChange={(e) => setNewRecurring({ ...newRecurring, title: e.target.value })}
+                                                placeholder="e.g., Time to move!"
+                                                className="bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Message
+                                        </label>
+                                        <Input
+                                            value={newRecurring.body}
+                                            onChange={(e) => setNewRecurring({ ...newRecurring, body: e.target.value })}
+                                            placeholder="e.g., Drink up! We're moving to the next bar in 15 minutes"
+                                            className="bg-white"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                            Map URL (optional)
+                                        </label>
+                                        <Input
+                                            value={newRecurring.mapUrl}
+                                            onChange={(e) => setNewRecurring({ ...newRecurring, mapUrl: e.target.value })}
+                                            placeholder="https://maps.apple.com/..."
+                                            className="bg-white"
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        onClick={addRecurringNotification}
+                                        disabled={!newRecurring.title.trim() || !newRecurring.body.trim()}
+                                        className="w-full"
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Notification
+                                    </Button>
                                 </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={notificationSettings?.arrivalNotifications ?? true}
-                                        onChange={(e) => updateNotificationSettings({
-                                            arrivalNotifications: e.target.checked
-                                        })}
-                                        className="rounded"
-                                    />
-                                    <span className="text-sm text-gray-700">Send arrival notifications</span>
-                                </label>
-
-                                <label className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={notificationSettings?.departureNotifications ?? true}
-                                        onChange={(e) => updateNotificationSettings({
-                                            departureNotifications: e.target.checked
-                                        })}
-                                        className="rounded"
-                                    />
-                                    <span className="text-sm text-gray-700">Send departure notifications</span>
-                                </label>
-                            </div>
-
-                            {/* Custom Notification Messages */}
-                            <div className="mt-6 pt-6 border-t border-gray-200">
-                                <h4 className="text-sm font-semibold text-gray-900 mb-4">Custom Notification Messages</h4>
-                                
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Reminder Notification Title
-                                        </label>
-                                        <Input
-                                            value={notificationSettings?.customReminderTitle || ''}
-                                            onChange={(e) => updateNotificationSettings({
-                                                customReminderTitle: e.target.value
-                                            })}
-                                            placeholder="Event Starting Soon!"
-                                            className="bg-white"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Leave empty to use default</p>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Reminder Notification Message
-                                        </label>
-                                        <Input
-                                            value={notificationSettings?.customReminderBody || ''}
-                                            onChange={(e) => updateNotificationSettings({
-                                                customReminderBody: e.target.value
-                                            })}
-                                            placeholder="Event starts in {minutes} minutes"
-                                            className="bg-white"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Use {"{minutes}"} as placeholder for minutes</p>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Leaving Notification Title
-                                        </label>
-                                        <Input
-                                            value={notificationSettings?.customLeavingTitle || ''}
-                                            onChange={(e) => updateNotificationSettings({
-                                                customLeavingTitle: e.target.value
-                                            })}
-                                            placeholder="Moving to Next Location"
-                                            className="bg-white"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Leave empty to use default</p>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Leaving Notification Message
-                                        </label>
-                                        <Input
-                                            value={notificationSettings?.customLeavingBody || ''}
-                                            onChange={(e) => updateNotificationSettings({
-                                                customLeavingBody: e.target.value
-                                            })}
-                                            placeholder="Leaving for {nextLocation} in {minutes} minutes"
-                                            className="bg-white"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Use {"{nextLocation}"} and {"{minutes}"} as placeholders</p>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Map Confirmation Message
-                                        </label>
-                                        <Input
-                                            value={notificationSettings?.customMapConfirmMessage || ''}
-                                            onChange={(e) => updateNotificationSettings({
-                                                customMapConfirmMessage: e.target.value
-                                            })}
-                                            placeholder="This will open the location in your default maps application"
-                                            className="bg-white"
-                                        />
-                                        <p className="text-xs text-gray-500 mt-1">Message shown when user clicks "Open Map"</p>
-                                    </div>
-                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    💡 These notifications will be sent daily at the specified time to all participants with tickets for that day.
+                                </p>
                             </div>
                         </div>
                     )}
