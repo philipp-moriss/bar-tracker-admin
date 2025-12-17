@@ -191,3 +191,177 @@ exports.sendTestPush = functions.https.onRequest((req, res) => {
     }
   });
 });
+
+// Geocode address to coordinates using Google Geocoding API
+exports.geocodeAddress = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    try {
+      // Handle preflight request
+      if (req.method === 'OPTIONS') {
+        res.status(200).send('');
+        return;
+      }
+
+      // Only allow POST requests
+      if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+      }
+
+      const { data } = req.body;
+      const { address, city, country, name } = data || {};
+
+      if (!address || !city || !country) {
+        res.status(400).json({ 
+          error: 'Missing required fields: address, city, country' 
+        });
+        return;
+      }
+
+      // Получаем API ключ из переменных окружения
+      // В Firebase Functions можно установить через: firebase functions:config:set geocoding.api_key="YOUR_KEY"
+      const apiKey = functions.config().geocoding?.api_key || process.env.GOOGLE_GEOCODING_API_KEY;
+      
+      if (!apiKey) {
+        console.error('Google Geocoding API key is not configured');
+        res.status(500).json({ 
+          error: 'Geocoding service is not configured. Please set GOOGLE_GEOCODING_API_KEY environment variable.' 
+        });
+        return;
+      }
+
+      // Формируем полный адрес для геокодирования
+      const fullAddress = `${address}, ${city}, ${country}`;
+      const encodedAddress = encodeURIComponent(fullAddress);
+      
+      // Сначала пробуем Places API (если есть название заведения)
+      let placesResults = [];
+      if (name && name.trim()) {
+        try {
+          const placesQuery = encodeURIComponent(`${name} ${fullAddress}`);
+          const placesUrl = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${placesQuery}&key=${apiKey}`;
+          const placesResponse = await fetch(placesUrl);
+          const placesResult = await placesResponse.json();
+          
+          if (placesResult.status === 'OK' && placesResult.results && placesResult.results.length > 0) {
+            placesResults = placesResult.results.slice(0, 5).map(place => ({
+              latitude: place.geometry.location.lat,
+              longitude: place.geometry.location.lng,
+              formattedAddress: place.formatted_address,
+              placeId: place.place_id,
+              name: place.name,
+              source: 'places'
+            }));
+          }
+        } catch (placesError) {
+          console.log('Places API error (falling back to Geocoding):', placesError);
+        }
+      }
+      
+      // Вызываем Google Geocoding API для получения нескольких вариантов
+      const geocodingUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodedAddress}&key=${apiKey}`;
+      
+      // Используем встроенный fetch (Node 18+)
+      const response = await fetch(geocodingUrl);
+      const result = await response.json();
+
+      // Детальное логирование для отладки
+      console.log('Geocoding request:', {
+        address: fullAddress,
+        url: geocodingUrl.replace(apiKey, '***HIDDEN***'),
+        status: result.status,
+        error_message: result.error_message,
+        error_message_details: result.error_message || 'No error message'
+      });
+
+      // Формируем список вариантов из Geocoding API
+      let geocodingResults = [];
+      if (result.status === 'OK' && result.results && result.results.length > 0) {
+        geocodingResults = result.results.slice(0, 5).map(geoResult => ({
+          latitude: geoResult.geometry.location.lat,
+          longitude: geoResult.geometry.location.lng,
+          formattedAddress: geoResult.formatted_address,
+          placeId: geoResult.place_id,
+          name: null,
+          source: 'geocoding'
+        }));
+      }
+      
+      // Объединяем результаты: сначала Places API, потом Geocoding
+      const allResults = [...placesResults, ...geocodingResults];
+      
+      // Убираем дубликаты (по координатам)
+      const uniqueResults = [];
+      const seen = new Set();
+      for (const item of allResults) {
+        const key = `${item.latitude.toFixed(6)},${item.longitude.toFixed(6)}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueResults.push(item);
+        }
+      }
+      
+      if (uniqueResults.length > 0) {
+        // Если только один вариант - возвращаем его сразу
+        if (uniqueResults.length === 1) {
+          res.status(200).json({
+            data: {
+              success: true,
+              latitude: uniqueResults[0].latitude,
+              longitude: uniqueResults[0].longitude,
+              formattedAddress: uniqueResults[0].formattedAddress,
+              placeId: uniqueResults[0].placeId,
+              multipleResults: false
+            }
+          });
+        } else {
+          // Если несколько вариантов - возвращаем список
+          res.status(200).json({
+            data: {
+              success: true,
+              multipleResults: true,
+              results: uniqueResults,
+              // Для обратной совместимости возвращаем первый вариант
+              latitude: uniqueResults[0].latitude,
+              longitude: uniqueResults[0].longitude,
+              formattedAddress: uniqueResults[0].formattedAddress,
+              placeId: uniqueResults[0].placeId
+            }
+          });
+        }
+      } else if (result.status === 'ZERO_RESULTS') {
+        res.status(404).json({
+          error: 'Address not found',
+          message: 'Could not find coordinates for the provided address'
+        });
+      } else if (result.status === 'REQUEST_DENIED') {
+        // Детальная ошибка для случая, когда API ключ не авторизован
+        const errorDetails = result.error_message || 'API key is not authorized';
+        console.error('Geocoding API REQUEST_DENIED:', {
+          error_message: errorDetails,
+          possible_causes: [
+            'Geocoding API is not enabled for this project',
+            'API key does not have Geocoding API in its restrictions',
+            'API key has application restrictions that block this request'
+          ]
+        });
+        res.status(403).json({
+          error: 'API key authorization failed',
+          message: errorDetails,
+          hint: 'Please check: 1) Geocoding API is enabled in Google Cloud Console, 2) API key has Geocoding API in its restrictions, 3) API key application restrictions allow server-side usage'
+        });
+      } else {
+        console.error('Geocoding API error:', result.status, result.error_message);
+        res.status(500).json({
+          error: 'Geocoding failed',
+          message: result.error_message || 'Unknown error occurred',
+          status: result.status
+        });
+      }
+
+    } catch (error) {
+      console.error('Error in geocodeAddress:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+});

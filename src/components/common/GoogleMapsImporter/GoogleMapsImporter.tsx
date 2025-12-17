@@ -28,8 +28,8 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
                 throw new Error('Not a Google Maps URL')
             }
 
-            // Pattern 1: @lat,lng,zoom (new format)
-            const atPattern = /@(-?\d+\.?\d*),(-?\d+\.?\d*),(\d+\.?\d*)z/
+            // Pattern 1: @lat,lng,zoom (new format) - расширенный вариант
+            const atPattern = /@(-?\d+\.?\d*),(-?\d+\.?\d*)(?:,(\d+\.?\d*)z)?/
             const atMatch = cleanUrl.match(atPattern)
             if (atMatch) {
                 return {
@@ -71,8 +71,69 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
                 }
             }
 
+            // Pattern 5: center=lat,lng (используется в некоторых форматах)
+            const centerPattern = /center=(-?\d+\.?\d*),(-?\d+\.?\d*)/
+            const centerMatch = cleanUrl.match(centerPattern)
+            if (centerMatch) {
+                return {
+                    latitude: parseFloat(centerMatch[1]),
+                    longitude: parseFloat(centerMatch[2])
+                }
+            }
+
+            // Pattern 6: /place/.../@lat,lng - новый формат с place
+            const placePattern = /\/place\/[^/]+\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/
+            const placeMatch = cleanUrl.match(placePattern)
+            if (placeMatch) {
+                return {
+                    latitude: parseFloat(placeMatch[1]),
+                    longitude: parseFloat(placeMatch[2])
+                }
+            }
+
+            // Pattern 7: /dir/.../@lat,lng - формат для маршрутов
+            const dirPattern = /\/dir\/[^/]+\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/
+            const dirMatch = cleanUrl.match(dirPattern)
+            if (dirMatch) {
+                return {
+                    latitude: parseFloat(dirMatch[1]),
+                    longitude: parseFloat(dirMatch[2])
+                }
+            }
+
+            // Pattern 8: Парсинг из query параметров, когда q содержит адрес, но координаты в других параметрах
+            // Попытка найти координаты в параметрах data или в URL после декодирования
+            try {
+                const urlObj = new URL(cleanUrl)
+                const params = urlObj.searchParams
+                
+                // Проверяем параметр data (используется в некоторых форматах)
+                const dataParam = params.get('data')
+                if (dataParam) {
+                    // Пытаемся найти координаты в data параметре
+                    const dataCoords = dataParam.match(/(-?\d+\.?\d*),(-?\d+\.?\d*)/)
+                    if (dataCoords) {
+                        return {
+                            latitude: parseFloat(dataCoords[1]),
+                            longitude: parseFloat(dataCoords[2])
+                        }
+                    }
+                }
+            } catch (e) {
+                // Игнорируем ошибки парсинга URL
+            }
+
+            // Логируем проблемный URL для дальнейшего анализа
+            console.warn('[GoogleMapsImporter] Не удалось распарсить URL:', cleanUrl)
+            
+            // Пытаемся сохранить проблемный URL в Firestore для анализа (опционально)
+            // Это можно включить позже, если нужно собирать статистику проблемных URL
+            
             throw new Error('Could not extract coordinates from URL')
         } catch (error) {
+            if (error instanceof Error && error.message !== 'Could not extract coordinates from URL') {
+                throw error
+            }
             throw new Error('Invalid Google Maps URL format')
         }
     }

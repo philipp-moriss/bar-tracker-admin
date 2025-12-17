@@ -3,11 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, MapPin } from 'lucide-react';
 import { AdminLayout } from '@/core/components/layout/AdminLayout';
 import { ImageUpload } from '@/components/common/ImageUpload/ImageUpload';
 import { ImageUploadResult } from '@/core/services/imageService';
 import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
+import { geocodingService } from '@/core/services/geocodingService';
+import { MapPreview } from '@/components/common/MapPreview/MapPreview';
+import { GeocodingResultsSelector } from '@/components/common/GeocodingResultsSelector/GeocodingResultsSelector';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/core/components/ui/dialog';
 
 import { Button } from '@/core/components/ui/button';
 import {
@@ -49,6 +53,9 @@ export const CreateBarPage = () => {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]);
+    const [geocodingLoading, setGeocodingLoading] = useState(false);
+    const [showGeocodingResults, setShowGeocodingResults] = useState(false);
+    const [geocodingResults, setGeocodingResults] = useState<any[]>([]);
 
     const form = useForm<CreateBarFormData>({
         resolver: zodResolver(createBarSchema),
@@ -73,6 +80,32 @@ export const CreateBarPage = () => {
 
             // Clean up empty strings
             const round = (v: number) => Math.round(v * 1e6) / 1e6
+            let latitude = round(data.latitude)
+            let longitude = round(data.longitude)
+
+            // Auto-geocoding if coordinates are empty or zero
+            if ((latitude === 0 && longitude === 0) || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+                if (data.address && data.city && data.country) {
+                    try {
+                        toast.info('Coordinates not specified, attempting to get them from address...')
+                        const result = await geocodingService.geocodeAddress(data.address, data.city, data.country, data.name)
+                        // If multiple results - use the first one
+                        latitude = round(result.latitude)
+                        longitude = round(result.longitude)
+                        toast.success('Coordinates obtained automatically')
+                    } catch (error) {
+                        console.error('Auto-geocoding failed:', error)
+                        toast.error('Failed to automatically get coordinates. Please enter them manually or use the "Get coordinates by address" button')
+                        setLoading(false)
+                        return
+                    }
+                } else {
+                    toast.error('Please enter coordinates or fill in address, city and country for automatic coordinate retrieval')
+                    setLoading(false)
+                    return
+                }
+            }
+
             const cleanData: CreateBarData = {
                 name: data.name,
                 address: data.address,
@@ -85,7 +118,7 @@ export const CreateBarPage = () => {
                 isActive: data.isActive,
                 // Images
                 images: uploadedImages.map(img => img.url),
-                coordinates: { latitude: round(data.latitude), longitude: round(data.longitude) },
+                coordinates: { latitude, longitude },
             };
 
             await barService.createBar(cleanData);
@@ -283,6 +316,91 @@ export const CreateBarPage = () => {
                                 {/* Google Maps Importer */}
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-barTrekker-darkGrey">Location Coordinates</h3>
+                                    
+                                    {/* Geocoding by address */}
+                                    <div className="flex items-end gap-2">
+                                        <div className="flex-1">
+                                            <p className="text-sm text-gray-600 mb-2">
+                                                Get coordinates automatically by address
+                                            </p>
+                                            <Button
+                                                type="button"
+                                                onClick={async () => {
+                                                    const address = form.watch('address')
+                                                    const city = form.watch('city')
+                                                    const country = form.watch('country')
+                                                    const name = form.watch('name')
+                                                    
+                                                    if (!address || !city || !country) {
+                                                        toast.error('Please fill in address, city and country before geocoding')
+                                                        return
+                                                    }
+                                                    
+                                                    setGeocodingLoading(true)
+                                                    try {
+                                                        const result = await geocodingService.geocodeAddress(address, city, country, name)
+                                                        const round = (v: number) => Math.round(v * 1e6) / 1e6
+                                                        
+                                                        // If multiple results - show selection
+                                                        if (result.multipleResults && result.results && result.results.length > 1) {
+                                                            setGeocodingResults(result.results)
+                                                            setShowGeocodingResults(true)
+                                                        } else {
+                                                            // Single result - apply immediately
+                                                            form.setValue('latitude', round(result.latitude))
+                                                            form.setValue('longitude', round(result.longitude))
+                                                            toast.success(`Coordinates obtained: ${result.latitude.toFixed(6)}, ${result.longitude.toFixed(6)}`)
+                                                        }
+                                                    } catch (error) {
+                                                        console.error('Geocoding error:', error)
+                                                        toast.error(error instanceof Error ? error.message : 'Failed to get coordinates by address')
+                                                    } finally {
+                                                        setGeocodingLoading(false)
+                                                    }
+                                                }}
+                                                disabled={geocodingLoading || loading}
+                                                variant="outline"
+                                                className="w-full"
+                                            >
+                                                {geocodingLoading ? (
+                                                    <>
+                                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                                                        Getting coordinates...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <MapPin className="h-4 w-4 mr-2" />
+                                                        Get coordinates by address
+                                                    </>
+                                                )}
+                                            </Button>
+                                            
+                                            {/* Dialog for selecting from multiple results */}
+                                            <Dialog open={showGeocodingResults} onOpenChange={setShowGeocodingResults}>
+                                                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                                    <DialogHeader>
+                                                        <DialogTitle>Select the correct address</DialogTitle>
+                                                    </DialogHeader>
+                                                    <GeocodingResultsSelector
+                                                        results={geocodingResults}
+                                                        onSelect={(result) => {
+                                                            const round = (v: number) => Math.round(v * 1e6) / 1e6
+                                                            form.setValue('latitude', round(result.latitude))
+                                                            form.setValue('longitude', round(result.longitude))
+                                                            setShowGeocodingResults(false)
+                                                            toast.success(`Coordinates selected: ${result.latitude.toFixed(6)}, ${result.longitude.toFixed(6)}`)
+                                                        }}
+                                                        onCancel={() => setShowGeocodingResults(false)}
+                                                    />
+                                                </DialogContent>
+                                            </Dialog>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="text-xs text-gray-500">
+                                        Or paste Google Maps link below
+                                    </div>
+                                    
                                     <GoogleMapsImporter
                                         onCoordinatesFound={(latitude, longitude) => {
                                             const round = (v: number) => Math.round(v * 1e6) / 1e6
@@ -336,6 +454,17 @@ export const CreateBarPage = () => {
                                                 <FormMessage />
                                             </FormItem>
                                         )}
+                                    />
+                                </div>
+
+                                {/* Map Preview */}
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-semibold text-barTrekker-darkGrey">Map Preview</h4>
+                                    <MapPreview
+                                        latitude={form.watch('latitude')}
+                                        longitude={form.watch('longitude')}
+                                        address={form.watch('address') ? `${form.watch('address')}, ${form.watch('city')}, ${form.watch('country')}` : undefined}
+                                        height={250}
                                     />
                                 </div>
 
