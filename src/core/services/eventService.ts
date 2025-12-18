@@ -8,12 +8,14 @@ import {
   deleteDoc,
   query,
   where,
-  Timestamp
+  Timestamp,
+  writeBatch
 } from 'firebase/firestore'
 import { db } from '@/modules/firebase/config'
 import { Event, CreateEventData, UpdateEventData, EventFilters, EventStats, EventStatus } from '@/core/types/event'
 
 const eventsCollection = collection(db, 'events')
+const notificationSchedulesCollection = collection(db, 'notificationSchedules')
 
 /**
  * Get all events with optional filters
@@ -154,6 +156,16 @@ async function createEvent(eventData: CreateEventData): Promise<Event> {
     const docRef = await addDoc(eventsCollection, eventToCreate)
     console.log('🟢 createEvent: Document added successfully with ID:', docRef.id)
 
+    // Create automatic location change notifications if event has route
+    if (eventData.route?.locations && eventData.route.locations.length > 1) {
+      try {
+        await createLocationChangeNotifications(docRef.id, eventData);
+      } catch (error) {
+        console.error('Error creating location change notifications:', error);
+        // Don't fail event creation if notifications fail
+      }
+    }
+
     return {
       id: docRef.id,
       ...eventData,
@@ -222,6 +234,21 @@ async function updateEvent(eventData: UpdateEventData): Promise<void> {
 
     await updateDoc(docRef, updatePayload)
 
+    // Recreate location change notifications if route or notification settings changed
+    if (updatePayload.route || updatePayload.notificationSettings || updatePayload.startTime) {
+      try {
+        // Get updated event data
+        const updatedEventDoc = await getDoc(docRef);
+        if (updatedEventDoc.exists()) {
+          const updatedEvent = { id: updatedEventDoc.id, ...updatedEventDoc.data() } as Event;
+          await createLocationChangeNotifications(id, updatedEvent);
+        }
+      } catch (error) {
+        console.error('Error updating location change notifications:', error);
+        // Don't fail event update if notifications fail
+      }
+    }
+
     console.log('🟢 updateEvent: Event updated successfully');
   } catch (error: any) {
     console.error('🔴 updateEvent: Error updating event:', error)
@@ -286,6 +313,93 @@ async function getEventStats(): Promise<EventStats> {
   } catch (error) {
     console.error('Error getting event stats:', error)
     throw new Error('Failed to fetch event statistics')
+  }
+}
+
+/**
+ * Create automatic location change notifications for event route
+ */
+async function createLocationChangeNotifications(eventId: string, event: Event | CreateEventData): Promise<void> {
+  try {
+    // Check if event has route and notification settings
+    if (!event.route?.locations || event.route.locations.length < 2) {
+      return; // No route or only one location - no notifications needed
+    }
+
+    if (!event.notificationSettings?.locationReminders) {
+      return; // No location reminders configured
+    }
+
+    if (!event.startTime) {
+      return; // No start time - can't calculate location times
+    }
+
+    const startTime = event.startTime instanceof Date 
+      ? event.startTime 
+      : (event.startTime as any)?.toDate?.() || new Date(event.startTime);
+
+    // Delete old location change notifications for this event
+    const oldNotificationsQuery = query(
+      notificationSchedulesCollection,
+      where('eventId', '==', eventId),
+      where('type', '==', 'location_change')
+    );
+    const oldNotifications = await getDocs(oldNotificationsQuery);
+    const batch = writeBatch(db);
+    oldNotifications.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    // Calculate timing for each location
+    const locations = event.route.locations;
+    const locationReminders = event.notificationSettings.locationReminders;
+    const customLeavingTitle = event.notificationSettings.customLeavingTitle || 'Time to move!';
+    const customLeavingBody = event.notificationSettings.customLeavingBody || 'We are moving to the next location.';
+
+    // Create notifications for each location (except first one)
+    for (let i = 1; i < locations.length; i++) {
+      const location = locations[i];
+      const previousLocation = locations[i - 1];
+
+      // Calculate start time for this location
+      const locationStartTime = new Date(startTime);
+      for (let j = 0; j < i; j++) {
+        locationStartTime.setMinutes(locationStartTime.getMinutes() + locations[j].stayDuration);
+      }
+
+      // Calculate notification time (locationReminders minutes before location starts)
+      const notificationTime = new Date(locationStartTime);
+      notificationTime.setMinutes(notificationTime.getMinutes() - locationReminders);
+
+      // Skip if notification time is in the past
+      if (notificationTime.getTime() <= Date.now()) {
+        continue;
+      }
+
+      // Build map URL from coordinates
+      const mapUrl = `${location.coordinates.latitude},${location.coordinates.longitude}`;
+
+      // Create notification
+      const notification = {
+        eventId,
+        title: customLeavingTitle,
+        body: customLeavingBody,
+        mapUrl,
+        fireDate: Timestamp.fromDate(notificationTime),
+        audienceUserIds: [], // Empty - system will find users by eventId
+        sent: false,
+        type: 'location_change',
+        locationIndex: i,
+        locationId: location.id,
+        createdAt: Timestamp.now()
+      };
+
+      await addDoc(notificationSchedulesCollection, notification);
+    }
+  } catch (error) {
+    console.error('Error creating location change notifications:', error);
+    // Don't throw - this is a background operation
   }
 }
 

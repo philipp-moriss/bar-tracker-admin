@@ -7,6 +7,7 @@ import { Textarea } from '@/core/components/ui/inputs/textarea';
 import { GoogleMapsImporter } from '@/components/common/GoogleMapsImporter/GoogleMapsImporter';
 import { EventLocation, EventRoute, EventNotificationSettings, EventRecurringNotification } from '@/core/types/event';
 import { Bar } from '@/core/types/bar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/core/components/ui/inputs/select';
 
 interface EventRouteManagerProps {
     route?: EventRoute;
@@ -81,7 +82,7 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
 }) => {
     const [showRouteBuilder, setShowRouteBuilder] = useState(false);
     const [showRecurringNotifications, setShowRecurringNotifications] = useState(false);
-    const [newRecurring, setNewRecurring] = useState({ time: '20:00', title: '', body: '', mapUrl: '' });
+    const [newRecurring, setNewRecurring] = useState({ time: '20:00', title: '', body: '', mapUrl: '', isLocationChange: false, locationId: '' });
     const [editingNotificationId, setEditingNotificationId] = useState<string | null>(null);
 
     const createStartLocationFromBar = (bar: Bar): EventLocation => {
@@ -209,6 +210,11 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
     const addRecurringNotification = () => {
         if (!newRecurring.title.trim() || !newRecurring.body.trim() || !newRecurring.time) return;
         
+        // If location change is enabled, locationId is required
+        if (newRecurring.isLocationChange && !newRecurring.locationId) {
+            return;
+        }
+        
         // Convert local time to UTC for storage
         const utcTime = localToUtc(newRecurring.time, timezone);
         
@@ -219,10 +225,12 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
             body: newRecurring.body.trim(),
             mapUrl: newRecurring.mapUrl.trim() || undefined,
             isActive: true,
+            isLocationChange: newRecurring.isLocationChange || false,
+            locationId: newRecurring.isLocationChange ? newRecurring.locationId : undefined,
         };
 
         onRecurringNotificationsChange?.([...recurringNotifications, newNotification]);
-        setNewRecurring({ time: '20:00', title: '', body: '', mapUrl: '' });
+        setNewRecurring({ time: '20:00', title: '', body: '', mapUrl: '', isLocationChange: false, locationId: '' });
     };
 
     const updateRecurringNotification = (id: string, updates: Partial<EventRecurringNotification>) => {
@@ -605,8 +613,20 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                                             </div>
                                             {/* Read-only view */}
                                             <div className="mt-2 text-sm">
-                                                <p className="font-medium text-gray-900">{notification.title}</p>
+                                                <div className="flex items-center space-x-2 mb-1">
+                                                    <p className="font-medium text-gray-900">{notification.title}</p>
+                                                    {notification.isLocationChange && (
+                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded">
+                                                            Location Change
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-gray-600">{notification.body}</p>
+                                                {notification.isLocationChange && notification.locationId && route?.locations && (
+                                                    <p className="text-xs text-blue-600 mt-1">
+                                                        📍 Location: {route.locations.find(l => l.id === notification.locationId)?.name || 'Unknown'}
+                                                    </p>
+                                                )}
                                                 {notification.mapUrl && (
                                                     <p className="text-xs text-blue-600 mt-1 truncate">
                                                         📍 {notification.mapUrl}
@@ -676,6 +696,49 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                                                             className="bg-white"
                                                         />
                                                     </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <input
+                                                            type="checkbox"
+                                                            id={`location-change-${notification.id}`}
+                                                            checked={notification.isLocationChange || false}
+                                                            onChange={(e) =>
+                                                                updateRecurringNotification(notification.id, {
+                                                                    isLocationChange: e.target.checked,
+                                                                    locationId: e.target.checked ? notification.locationId || '' : undefined,
+                                                                })
+                                                            }
+                                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                                        />
+                                                        <label htmlFor={`location-change-${notification.id}`} className="text-sm font-medium text-gray-700">
+                                                            Location Change
+                                                        </label>
+                                                    </div>
+                                                    {notification.isLocationChange && route?.locations && route.locations.length > 0 && (
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                                Select Location
+                                                            </label>
+                                                            <Select
+                                                                value={notification.locationId || ''}
+                                                                onValueChange={(value) =>
+                                                                    updateRecurringNotification(notification.id, {
+                                                                        locationId: value,
+                                                                    })
+                                                                }
+                                                            >
+                                                                <SelectTrigger className="bg-white">
+                                                                    <SelectValue placeholder="Select location" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {route.locations.map((loc) => (
+                                                                        <SelectItem key={loc.id} value={loc.id}>
+                                                                            {loc.name} ({loc.address})
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -739,10 +802,44 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                                             className="bg-white"
                                         />
                                     </div>
+                                    <div className="flex items-center space-x-2">
+                                        <input
+                                            type="checkbox"
+                                            id="new-location-change"
+                                            checked={newRecurring.isLocationChange}
+                                            onChange={(e) => setNewRecurring({ ...newRecurring, isLocationChange: e.target.checked, locationId: e.target.checked ? newRecurring.locationId : '' })}
+                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        />
+                                        <label htmlFor="new-location-change" className="text-sm font-medium text-gray-700">
+                                            Location Change
+                                        </label>
+                                    </div>
+                                    {newRecurring.isLocationChange && route?.locations && route.locations.length > 0 && (
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                Select Location
+                                            </label>
+                                            <Select
+                                                value={newRecurring.locationId}
+                                                onValueChange={(value) => setNewRecurring({ ...newRecurring, locationId: value })}
+                                            >
+                                                <SelectTrigger className="bg-white">
+                                                    <SelectValue placeholder="Select location" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {route.locations.map((loc) => (
+                                                        <SelectItem key={loc.id} value={loc.id}>
+                                                            {loc.name} ({loc.address})
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
                                     <Button
                                         type="button"
                                         onClick={addRecurringNotification}
-                                        disabled={!newRecurring.title.trim() || !newRecurring.body.trim()}
+                                        disabled={!newRecurring.title.trim() || !newRecurring.body.trim() || (newRecurring.isLocationChange && !newRecurring.locationId)}
                                         className="w-full"
                                     >
                                         <Plus className="h-4 w-4 mr-2" />

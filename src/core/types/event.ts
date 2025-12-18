@@ -44,6 +44,9 @@ export interface EventRecurringNotification {
   body: string
   mapUrl?: string
   isActive: boolean
+  // Location change notification fields
+  isLocationChange?: boolean // If true, this notification is for location change
+  locationId?: string // ID of the location to change to (if isLocationChange === true)
 }
 
 // Event types based on mobile app structure
