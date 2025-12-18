@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, MapPin, Clock, Settings, Navigation, Repeat, Power, PowerOff } from 'lucide-react';
+import { Plus, Trash2, MapPin, Clock, Settings, Navigation, Repeat, Power, PowerOff, Pencil } from 'lucide-react';
 import { Button } from '@/core/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/core/components/ui/card';
 import { Input } from '@/core/components/ui/inputs/input';
@@ -82,6 +82,7 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
     const [showRouteBuilder, setShowRouteBuilder] = useState(false);
     const [showRecurringNotifications, setShowRecurringNotifications] = useState(false);
     const [newRecurring, setNewRecurring] = useState({ time: '20:00', title: '', body: '', mapUrl: '' });
+    const [editingNotificationId, setEditingNotificationId] = useState<string | null>(null);
 
     const createStartLocationFromBar = (bar: Bar): EventLocation => {
         return {
@@ -222,6 +223,14 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
 
         onRecurringNotificationsChange?.([...recurringNotifications, newNotification]);
         setNewRecurring({ time: '20:00', title: '', body: '', mapUrl: '' });
+    };
+
+    const updateRecurringNotification = (id: string, updates: Partial<EventRecurringNotification>) => {
+        onRecurringNotificationsChange?.(
+            recurringNotifications.map((n) =>
+                n.id === id ? { ...n, ...updates } : n
+            )
+        );
     };
 
     const removeRecurringNotification = (id: string) => {
@@ -565,6 +574,19 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                                                         type="button"
                                                         variant="ghost"
                                                         size="sm"
+                                                        onClick={() =>
+                                                            setEditingNotificationId(
+                                                                editingNotificationId === notification.id ? null : notification.id
+                                                            )
+                                                        }
+                                                        className="text-gray-600 hover:text-gray-800"
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
                                                         onClick={() => toggleRecurringNotification(notification.id)}
                                                         className={notification.isActive ? "text-amber-600 hover:text-amber-700" : "text-green-600 hover:text-green-700"}
                                                     >
@@ -581,13 +603,81 @@ export const EventRouteManager: React.FC<EventRouteManagerProps> = ({
                                                     </Button>
                                                 </div>
                                             </div>
-                                            <div className="text-sm">
+                                            {/* Read-only view */}
+                                            <div className="mt-2 text-sm">
                                                 <p className="font-medium text-gray-900">{notification.title}</p>
                                                 <p className="text-gray-600">{notification.body}</p>
                                                 {notification.mapUrl && (
-                                                    <p className="text-xs text-blue-600 mt-1 truncate">📍 {notification.mapUrl}</p>
+                                                    <p className="text-xs text-blue-600 mt-1 truncate">
+                                                        📍 {notification.mapUrl}
+                                                    </p>
                                                 )}
                                             </div>
+
+                                            {/* Edit mode */}
+                                            {editingNotificationId === notification.id && (
+                                                <div className="mt-4 space-y-2 text-sm border-t border-gray-200 pt-3">
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                        <div>
+                                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                                Time ({timezone.split('/').pop()})
+                                                            </label>
+                                                            <Input
+                                                                type="time"
+                                                                value={utcToLocal(notification.time, timezone)}
+                                                                onChange={(e) =>
+                                                                    updateRecurringNotification(notification.id, {
+                                                                        time: localToUtc(e.target.value, timezone),
+                                                                    })
+                                                                }
+                                                                className="bg-white"
+                                                            />
+                                                        </div>
+                                                        <div className="md:col-span-3">
+                                                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                                Title
+                                                            </label>
+                                                            <Input
+                                                                value={notification.title}
+                                                                onChange={(e) =>
+                                                                    updateRecurringNotification(notification.id, {
+                                                                        title: e.target.value,
+                                                                    })
+                                                                }
+                                                                className="bg-white"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                            Message
+                                                        </label>
+                                                        <Input
+                                                            value={notification.body}
+                                                            onChange={(e) =>
+                                                                updateRecurringNotification(notification.id, {
+                                                                    body: e.target.value,
+                                                                })
+                                                            }
+                                                            className="bg-white"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                                                            Map URL (optional)
+                                                        </label>
+                                                        <Input
+                                                            value={notification.mapUrl || ''}
+                                                            onChange={(e) =>
+                                                                updateRecurringNotification(notification.id, {
+                                                                    mapUrl: e.target.value || undefined,
+                                                                })
+                                                            }
+                                                            className="bg-white"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
