@@ -388,9 +388,6 @@ export const EditBarPage = () => {
                                                 handleCoordinateUpdate(latitude, longitude);
                                             }}
                                         />
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            Open the bar address in Google Maps, copy the link, and paste it above. Coordinates will populate automatically.
-                                        </p>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
