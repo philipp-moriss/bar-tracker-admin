@@ -192,6 +192,139 @@ exports.sendTestPush = functions.https.onRequest((req, res) => {
   });
 });
 
+// Expand short Google Maps URL to full URL
+exports.expandGoogleMapsUrl = functions.https.onRequest((req, res) => {
+  return cors(req, res, async () => {
+    try {
+      // Handle preflight request
+      if (req.method === 'OPTIONS') {
+        res.status(200).send('');
+        return;
+      }
+
+      // Only allow POST requests
+      if (req.method !== 'POST') {
+        res.status(405).send('Method Not Allowed');
+        return;
+      }
+
+      const { data } = req.body;
+      const { url } = data || {};
+
+      if (!url || typeof url !== 'string') {
+        res.status(400).json({ 
+          error: 'Missing required field: url' 
+        });
+        return;
+      }
+
+      // Check if this is a short Google Maps URL
+      if (!url.includes('maps.app.goo.gl') && !url.includes('goo.gl/maps')) {
+        // If it's already a full URL, return it as is
+        res.status(200).json({
+          data: {
+            success: true,
+            expandedUrl: url
+          }
+        });
+        return;
+      }
+
+      try {
+        // Expand short URL via fetch with manual redirect handling
+        let currentUrl = url;
+        let expandedUrl = url;
+        let redirectCount = 0;
+        const maxRedirects = 10;
+
+        while (redirectCount < maxRedirects) {
+          const response = await fetch(currentUrl, {
+            method: 'GET',
+            redirect: 'manual', // Handle redirects manually
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9'
+            }
+          });
+
+          // Check redirect status
+          if (response.status >= 300 && response.status < 400) {
+            const location = response.headers.get('location');
+            if (location) {
+              // Handle relative and absolute URLs
+              if (location.startsWith('http://') || location.startsWith('https://')) {
+                currentUrl = location;
+              } else if (location.startsWith('//')) {
+                currentUrl = 'https:' + location;
+              } else {
+                // Relative URL
+                const baseUrl = new URL(currentUrl);
+                currentUrl = new URL(location, baseUrl.origin).href;
+              }
+              expandedUrl = currentUrl;
+              redirectCount++;
+              continue;
+            }
+          }
+
+          // If this is the final response, use response.url or current URL
+          if (response.status === 200) {
+            // In Node.js fetch, response.url contains the final URL after redirects
+            expandedUrl = response.url || currentUrl;
+            
+            // If response.url doesn't contain full URL, try to extract from HTML
+            if (!expandedUrl.includes('google.com/maps') && expandedUrl === currentUrl) {
+              try {
+                const html = await response.text();
+                // Look for canonical URL or og:url in meta tags
+                const canonicalMatch = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
+                if (canonicalMatch && canonicalMatch[1]) {
+                  expandedUrl = canonicalMatch[1].startsWith('http') ? canonicalMatch[1] : `https://www.google.com${canonicalMatch[1]}`;
+                } else {
+                  // Look for og:url
+                  const ogUrlMatch = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
+                  if (ogUrlMatch && ogUrlMatch[1]) {
+                    expandedUrl = ogUrlMatch[1];
+                  }
+                }
+              } catch (htmlError) {
+                console.warn('[expandGoogleMapsUrl] Could not parse HTML:', htmlError);
+              }
+            }
+          } else {
+            expandedUrl = currentUrl;
+          }
+          break;
+        }
+
+        console.log('[expandGoogleMapsUrl] Expanded:', url, '->', expandedUrl);
+        console.log('[expandGoogleMapsUrl] Redirect count:', redirectCount);
+
+        res.status(200).json({
+          data: {
+            success: true,
+            expandedUrl: expandedUrl
+          }
+        });
+      } catch (fetchError) {
+        console.error('[expandGoogleMapsUrl] Error expanding URL:', fetchError);
+        // If expansion failed, return original URL
+        res.status(200).json({
+          data: {
+            success: true,
+            expandedUrl: url
+          }
+        });
+      }
+
+    } catch (error) {
+      console.error('Error in expandGoogleMapsUrl:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+});
+
 // Geocode address to coordinates using Google Geocoding API
 exports.geocodeAddress = functions.https.onRequest((req, res) => {
   return cors(req, res, async () => {

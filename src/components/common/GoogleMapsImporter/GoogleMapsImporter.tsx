@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Button } from '@/core/components/ui/button'
 import { Input } from '@/core/components/ui/inputs/input'
-import { MapPin, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react'
+import { MapPin, CheckCircle, AlertCircle } from 'lucide-react'
 import { cn } from '@/core/lib/utils'
 
 interface GoogleMapsImporterProps {
@@ -24,19 +24,41 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
                 return shortUrl
             }
 
-            console.log('[GoogleMapsImporter] Expanding short URL:', shortUrl)
-
-            const response = await fetch(shortUrl, {
-                method: 'HEAD',
-                redirect: 'follow'
+            // Use server function to expand short URLs
+            // This bypasses CORS issues on the client
+            const response = await fetch('https://us-central1-react-native-bartrekker.cloudfunctions.net/expandGoogleMapsUrl', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    data: {
+                        url: shortUrl
+                    }
+                })
             })
 
-            const fullUrl = response.url
-            console.log('[GoogleMapsImporter] Expanded URL:', fullUrl)
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            const result = await response.json()
             
-            return fullUrl
-        } catch (error) {
-            console.error('[GoogleMapsImporter] Error expanding short URL:', error)
+            if (result.data && result.data.expandedUrl) {
+                const expandedUrl = result.data.expandedUrl
+                
+                // Verify that URL was actually expanded
+                if (expandedUrl !== shortUrl && (expandedUrl.includes('google.com/maps') || expandedUrl.includes('maps.google.com'))) {
+                    return expandedUrl
+                }
+            }
+
+            // If server function didn't return expanded URL, return original
+            // Parser will try to process it directly
+            return shortUrl
+        } catch (_error) {
+            // If expansion failed, return original URL
+            // Parser will try to process it directly
             return shortUrl
         }
     }
@@ -59,10 +81,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const d4Match = cleanUrl.match(d4Pattern)
 
             if (d3Match && d4Match) {
-                console.log('[GoogleMapsImporter] Found exact place coordinates (!3d/!4d):', {
-                    latitude: parseFloat(d3Match[1]),
-                    longitude: parseFloat(d4Match[1])
-                })
                 return {
                     latitude: parseFloat(d3Match[1]),
                     longitude: parseFloat(d4Match[1])
@@ -73,13 +91,20 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const placePattern = /\/place\/[^/]+\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/
             const placeMatch = cleanUrl.match(placePattern)
             if (placeMatch) {
-                console.log('[GoogleMapsImporter] Found place coordinates (/place/):', {
-                    latitude: parseFloat(placeMatch[1]),
-                    longitude: parseFloat(placeMatch[2])
-                })
                 return {
                     latitude: parseFloat(placeMatch[1]),
                     longitude: parseFloat(placeMatch[2])
+                }
+            }
+
+            // PRIORITY 2.5: /search/lat,+lng or /search/lat,lng (new Google Maps format)
+            // Match coordinates after /search/ - coordinates can be followed by ? or / or end of string
+            const searchPattern = /\/search\/(-?\d+\.?\d*),\+?(-?\d+\.?\d*)/
+            const searchMatch = cleanUrl.match(searchPattern)
+            if (searchMatch) {
+                return {
+                    latitude: parseFloat(searchMatch[1]),
+                    longitude: parseFloat(searchMatch[2])
                 }
             }
 
@@ -87,10 +112,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const llPattern = /ll=(-?\d+\.?\d*),(-?\d+\.?\d*)/
             const llMatch = cleanUrl.match(llPattern)
             if (llMatch) {
-                console.log('[GoogleMapsImporter] Found coordinates (ll=):', {
-                    latitude: parseFloat(llMatch[1]),
-                    longitude: parseFloat(llMatch[2])
-                })
                 return {
                     latitude: parseFloat(llMatch[1]),
                     longitude: parseFloat(llMatch[2])
@@ -101,10 +122,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const qPattern = /q=(-?\d+\.?\d*),(-?\d+\.?\d*)/
             const qMatch = cleanUrl.match(qPattern)
             if (qMatch) {
-                console.log('[GoogleMapsImporter] Found coordinates (q=):', {
-                    latitude: parseFloat(qMatch[1]),
-                    longitude: parseFloat(qMatch[2])
-                })
                 return {
                     latitude: parseFloat(qMatch[1]),
                     longitude: parseFloat(qMatch[2])
@@ -115,10 +132,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const centerPattern = /center=(-?\d+\.?\d*),(-?\d+\.?\d*)/
             const centerMatch = cleanUrl.match(centerPattern)
             if (centerMatch) {
-                console.log('[GoogleMapsImporter] Found coordinates (center=):', {
-                    latitude: parseFloat(centerMatch[1]),
-                    longitude: parseFloat(centerMatch[2])
-                })
                 return {
                     latitude: parseFloat(centerMatch[1]),
                     longitude: parseFloat(centerMatch[2])
@@ -129,10 +142,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const dirPattern = /\/dir\/[^/]+\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/
             const dirMatch = cleanUrl.match(dirPattern)
             if (dirMatch) {
-                console.log('[GoogleMapsImporter] Found route coordinates (/dir/):', {
-                    latitude: parseFloat(dirMatch[1]),
-                    longitude: parseFloat(dirMatch[2])
-                })
                 return {
                     latitude: parseFloat(dirMatch[1]),
                     longitude: parseFloat(dirMatch[2])
@@ -145,10 +154,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
             const atPattern = /@(-?\d+\.?\d*),(-?\d+\.?\d*)(?:,(\d+\.?\d*)z)?/
             const atMatch = cleanUrl.match(atPattern)
             if (atMatch) {
-                console.warn('[GoogleMapsImporter] Found only viewport coordinates (@lat,lng) - may be inaccurate!', {
-                    latitude: parseFloat(atMatch[1]),
-                    longitude: parseFloat(atMatch[2])
-                })
                 return {
                     latitude: parseFloat(atMatch[1]),
                     longitude: parseFloat(atMatch[2])
@@ -164,21 +169,44 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
                 if (dataParam) {
                     const dataCoords = dataParam.match(/(-?\d+\.?\d*),(-?\d+\.?\d*)/)
                     if (dataCoords) {
-                        console.log('[GoogleMapsImporter] Found coordinates in data parameter:', {
-                            latitude: parseFloat(dataCoords[1]),
-                            longitude: parseFloat(dataCoords[2])
-                        })
                         return {
                             latitude: parseFloat(dataCoords[1]),
                             longitude: parseFloat(dataCoords[2])
                         }
                     }
                 }
-            } catch (e) {
+
+                // PRIORITY 9: Try to extract coordinates from pb parameter (new Google Maps format)
+                const pbParam = params.get('pb')
+                if (pbParam) {
+                    // pb parameter may contain coordinates in format !1m2!1m1!1s...!2m2!1d...!2d...
+                    const pbCoords = pbParam.match(/!2m2!1d(-?\d+\.?\d*)!2d(-?\d+\.?\d*)/)
+                    if (pbCoords) {
+                        return {
+                            latitude: parseFloat(pbCoords[1]),
+                            longitude: parseFloat(pbCoords[2])
+                        }
+                    }
+                }
+            } catch (_e) {
                 // Ignore URL parsing errors
             }
 
-            console.warn('[GoogleMapsImporter] Failed to parse URL:', cleanUrl)
+            // PRIORITY 10: Try to find coordinates anywhere in URL (last attempt)
+            // For cases when coordinates exist but in non-standard format
+            const anyCoordsPattern = /(-?\d+\.\d+),(-?\d+\.\d+)/
+            const anyMatch = cleanUrl.match(anyCoordsPattern)
+            if (anyMatch) {
+                const lat = parseFloat(anyMatch[1])
+                const lng = parseFloat(anyMatch[2])
+                // Verify that these are valid coordinates
+                if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                    return {
+                        latitude: lat,
+                        longitude: lng
+                    }
+                }
+            }
             
             throw new Error('Could not extract coordinates from URL')
         } catch (error) {
@@ -211,7 +239,8 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
                 setError('Could not extract coordinates from URL')
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to parse URL')
+            const errorMessage = err instanceof Error ? err.message : 'Failed to parse URL'
+            setError(errorMessage)
         } finally {
             setIsLoading(false)
         }
@@ -222,11 +251,6 @@ export const GoogleMapsImporter: React.FC<GoogleMapsImporterProps> = ({
         setError(null)
         setSuccess(false)
     }
-
-    const exampleUrls = [
-        'https://maps.google.com/maps?q=40.7128,-74.0060',
-        'https://maps.app.goo.gl/example'
-    ]
 
     return (
         <div className={cn('space-y-4', className)}>
